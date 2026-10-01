@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="sr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Klima Majstor</title>
+<meta name="theme-color" content="#14324f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Klima">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#eef2f5; --surface:#ffffff; --ink:#132433; --muted:#5d6f7f; --line:#d6dfe6;
+  --blue:#1d6fb5; --blue-soft:#e3eef8; --navy:#14324f;
+  --copper:#b8642a; --copper-soft:#f6e7db; --green:#2c7d4f; --green-soft:#e1f1e7; --red:#b3362f;
+  --radius:14px; --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0d1720; --surface:#16232f; --ink:#e6edf2; --muted:#93a4b3; --line:#26384a;
+  --blue:#5aa3e6; --blue-soft:#18324a; --navy:#0a1a28;
+  --copper:#e08a4c; --copper-soft:#3a2516; --green:#5cc08a; --green-soft:#15301f; --red:#ef6b62;
+  color-scheme:dark;
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",Roboto,"Segoe UI",sans-serif;
+  padding-bottom:calc(76px + var(--safe-b));min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--blue)}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+.top{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;
+  padding:calc(12px + var(--safe-t)) 16px 12px;display:flex;align-items:center;gap:12px}
+.top h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.01em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .back{background:none;border:0;color:#fff;font-size:26px;line-height:1;padding:0 6px 0 0;cursor:pointer}
+.top .tbtn{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:10px;padding:7px 12px;font-size:15px;cursor:pointer}
+
+main{padding:16px;max-width:720px;margin:0 auto}
+h2{font-size:15px;font-weight:650;color:var(--muted);margin:22px 4px 8px}
+h2:first-child{margin-top:4px}
+
+/* list rows */
+.list{background:var(--surface);border-radius:var(--radius);border:1px solid var(--line);overflow:hidden}
+.row{display:flex;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line);cursor:pointer;text-decoration:none;color:inherit}
+.row:first-child{border-top:0}
+.row .main{flex:1;min-width:0}
+.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .r{text-align:right;font-size:14px;color:var(--muted);flex-shrink:0}
+.when{width:52px;flex-shrink:0;text-align:center;font-variant-numeric:tabular-nums}
+.when b{display:block;font-size:17px}
+.when span{font-size:12px;color:var(--muted)}
+.empty{padding:22px 16px;text-align:center;color:var(--muted);font-size:15px}
+
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-soft);color:var(--blue)}
+.tag.copper{background:var(--copper-soft);color:var(--copper)}
+.tag.green{background:var(--green-soft);color:var(--green)}
+.tag.gray{background:var(--line);color:var(--muted)}
+
+/* the nameplate: next job card */
+.plate{background:var(--surface);border:2px solid var(--ink);border-radius:6px;overflow:hidden}
+.plate .ph{background:var(--ink);color:var(--surface);padding:6px 12px;font-size:13px;font-weight:600;display:flex;justify-content:space-between}
+.plate .pb{padding:14px 14px 4px}
+.plate .who{font-size:24px;font-weight:750;letter-spacing:-.02em;line-height:1.15}
+.plate dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:12px 0 10px;font-size:15px}
+.plate dt{color:var(--muted)}
+.plate dd{margin:0;font-weight:600}
+.plate .acts{display:grid;grid-template-columns:repeat(3,1fr);border-top:2px solid var(--ink)}
+.plate .acts a,.plate .acts button{padding:13px 4px;text-align:center;font-weight:650;text-decoration:none;color:var(--ink);background:none;border:0;border-left:1px solid var(--line);cursor:pointer;font-size:15px}
+.plate .acts>:first-child{border-left:0}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;cursor:pointer}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.stat span{font-size:13px;color:var(--muted)}
+.stat.warn b{color:var(--copper)}
+
+.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:12px;padding:12px 14px;font-weight:650;cursor:pointer;background:var(--blue);color:#fff;text-decoration:none;font-size:15px}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn.copper{background:var(--copper)}
+.btn.danger{background:none;color:var(--red);border:1px solid var(--line)}
+.btn.small{padding:7px 11px;font-size:14px;border-radius:10px}
+.btn.wide{width:100%}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+
+.seg{display:flex;background:var(--line);border-radius:11px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;padding:8px 4px;border-radius:9px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+
+.search{width:100%;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);margin-bottom:12px;font-size:16px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.contact .name{font-size:22px;font-weight:750;letter-spacing:-.02em}
+.contact .meta{color:var(--muted);margin:2px 0 12px}
+.contact .acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.note{white-space:pre-wrap;margin-top:10px;font-size:15px;color:var(--muted)}
+
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.photos img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block;cursor:pointer}
+.photos label{aspect-ratio:1;border:2px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;text-align:center;cursor:pointer;padding:4px}
+
+/* tab bar */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:var(--safe-b)}
+nav.tabs a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 7px;font-size:11px;font-weight:600;color:var(--muted);text-decoration:none}
+nav.tabs a svg{width:24px;height:24px}
+nav.tabs a.on{color:var(--blue)}
+
+/* sheet */
+.veil{position:fixed;inset:0;background:rgba(5,15,25,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:720px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;
+  padding:0 16px calc(20px + var(--safe-b));animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.sheet .sh{position:sticky;top:0;background:var(--bg);display:flex;align-items:center;padding:14px 0 10px;gap:10px;z-index:1}
+.sheet .sh h3{flex:1;margin:0;font-size:18px}
+.sheet .x{background:var(--line);border:0;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer;color:var(--ink)}
+.f{display:block;margin-bottom:12px}
+.f>span{display:block;font-size:14px;font-weight:600;color:var(--muted);margin:0 2px 4px}
+.f input,.f select,.f textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface);font-size:16px;min-height:46px}
+.f textarea{min-height:80px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chk{display:flex;align-items:center;gap:10px;margin:4px 2px 14px;font-weight:600}
+.chk input{width:22px;height:22px}
+fieldset{border:1px dashed var(--line);border-radius:12px;padding:12px 12px 0;margin:0 0 12px}
+fieldset[hidden]{display:none}
+
+/* quote items */
+.qi{display:grid;grid-template-columns:1fr 54px 92px 30px;gap:6px;align-items:center;margin-bottom:6px}
+.qi input{padding:9px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:16px;min-width:0;width:100%}
+.qi .rm{border:0;background:none;color:var(--red);font-size:20px;cursor:pointer}
+.qtotal{display:flex;justify-content:space-between;font-size:20px;font-weight:750;padding:12px 2px;border-top:2px solid var(--ink);margin-top:8px}
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
+.presets button{border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:6px 11px;font-size:13px;cursor:pointer}
+
+.toast{position:fixed;left:50%;top:calc(70px + var(--safe-t));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;z-index:40;font-size:15px;max-width:90vw;text-align:center}
+.viewer{position:fixed;inset:0;background:#000;z-index:30;display:flex;flex-direction:column}
+.viewer img{flex:1;min-height:0;object-fit:contain;width:100%}
+.viewer .vb{display:flex;justify-content:space-between;padding:12px 16px calc(12px + var(--safe-b));padding-top:calc(12px + var(--safe-t))}
+.hint{background:var(--blue-soft);border-radius:var(--radius);padding:12px 14px;font-size:14px;margin-bottom:12px}
+.hint b{display:block;margin-bottom:2px}
+
+/* print (ponuda) */
+#print{display:none}
+@media print{
+  body{padding:0;background:#fff;color:#000}
+  .top,nav.tabs,main,.veil,.toast{display:none!important}
+  #print{display:block;padding:24px;font-size:14px}
+  #print table{width:100%;border-collapse:collapse;margin:16px 0}
+  #print td,#print th{border-bottom:1px solid #ccc;padding:6px 4px;text-align:left}
+  #print .r{text-align:right}
+}
+</style>
+</head>
+<body>
+<header class="top" id="top"></header>
+<main id="main"></main>
+<nav class="tabs" id="tabs">
+  <a href="#danas" data-tab="danas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Danas</a>
+  <a href="#poslovi" data-tab="poslovi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Poslovi</a>
+  <a href="#klijenti" data-tab="klijenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-1.5-5-4-5.7"/></svg>Klijenti</a>
+  <a href="#servisi" data-tab="servisi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="8" rx="2"/><path d="M6 17c0 1.5-1 2-1 3M12 17c0 1.5-1 2-1 3M18 17c0 1.5-1 2-1 3M6 9h8"/></svg>Servisi</a>
+  <a href="#ponude" data-tab="ponude"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h5"/></svg>Ponude</a>
+</nav>
+<div id="print"></div>
+
+<script>
+'use strict';
+/* ---------- baza (IndexedDB) ---------- */
+const STORES=['clients','devices','jobs','quotes','photos','meta'];
+let DB;
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('klima-majstor',1);
+  r.onupgradeneeded=()=>{const db=r.result;STORES.forEach(s=>{if(!db.objectStoreNames.contains(s)){const st=db.createObjectStore(s,{keyPath:'id'});if(s==='photos')st.createIndex('clientId','clientId')}})};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+function tx(store,mode,fn){return new Promise((res,rej)=>{const t=DB.transaction(store,mode);const st=t.objectStore(store);const out=fn(st);t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);t.onerror=()=>rej(t.error)})}
+const dbAll=s=>tx(s,'readonly',st=>st.getAll());
+const dbPut=(s,o)=>tx(s,'readwrite',st=>st.put(o));
+const dbDel=(s,id)=>tx(s,'readwrite',st=>st.delete(id));
+const dbClear=s=>tx(s,'readwrite',st=>st.clear());
+const photosOf=cid=>tx('photos','readonly',st=>st.index('clientId').getAll(cid));
+
+const DEFAULT_SETTINGS={id:'settings',firm:'',phone:'',warranty:24,serviceMonths:12,
+  prices:[['Montaža klime (do 3 m instalacije)',10000],['Dodatni metar instalacije',1500],['Konzola za spoljnu jedinicu',2500],['Proboj zida',1500],['Servis i čišćenje',4000],['Dopuna freona',5000],['Demontaža',5000]],
+  sms:'Poštovani {ime}, prošlo je godinu dana od poslednjeg servisa vaše klime ({uredjaj}). Da zakažemo čišćenje i proveru? Pozdrav, {firma}'};
+const S={clients:[],devices:[],jobs:[],quotes:[],settings:{...DEFAULT_SETTINGS},lastBackup:null};
+
+async function load(){
+  for(const s of ['clients','devices','jobs','quotes'])S[s]=await dbAll(s);
+  const meta=await dbAll('meta');
+  const st=meta.find(m=>m.id==='settings');if(st)S.settings={...DEFAULT_SETTINGS,...st};
+  const lb=meta.find(m=>m.id==='lastBackup');S.lastBackup=lb?lb.value:null;
+}
+async function save(store,obj){obj.updated=Date.now();await dbPut(store,obj);const arr=S[store];const i=arr.findIndex(x=>x.id===obj.id);if(i>=0)arr[i]=obj;else arr.push(obj)}
+async function remove(store,id){await dbDel(store,id);S[store]=S[store].filter(x=>x.id!==id)}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+/* ---------- pomoćne ---------- */
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const isoOf=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const today=()=>isoOf(new Date());
+const parse=iso=>{const[y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d)};
+const addDays=(iso,n)=>{const d=parse(iso);d.setDate(d.getDate()+n);return isoOf(d)};
+const addMonths=(iso,n)=>{const d=parse(iso);const day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+Number(n));const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));return isoOf(d)};
+const daysBetween=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
+const DAYS=['ned','pon','uto','sre','čet','pet','sub'];
+const MON=['jan','feb','mar','apr','maj','jun','jul','avg','sep','okt','nov','dec'];
+const fmtDate=iso=>{if(!iso)return '';const d=parse(iso);return d.getDate()+'. '+MON[d.getMonth()]+' '+d.getFullYear()+'.'};
+const relDay=iso=>{const t=today();if(iso===t)return 'Danas';if(iso===addDays(t,1))return 'Sutra';if(iso===addDays(t,-1))return 'Juče';const d=parse(iso);return DAYS[d.getDay()][0].toUpperCase()+DAYS[d.getDay()].slice(1)+', '+d.getDate()+'. '+MON[d.getMonth()]+(d.getFullYear()!==new Date().getFullYear()?' '+d.getFullYear()+'.':'')};
+const money=n=>new Intl.NumberFormat('sr-RS').format(Math.round(Number(n)||0))+' din';
+const intlPhone=p=>{let d=String(p||'').replace(/[^\d+]/g,'');if(d.startsWith('+'))return d;if(d.startsWith('00'))return '+'+d.slice(2);if(d.startsWith('0'))return '+381'+d.slice(1);return d?'+'+d:''};
+const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const smsLink=(p,body)=>'sms:'+intlPhone(p)+(body?(isIOS?'&':'?')+'body='+encodeURIComponent(body):'');
+const mapLink=a=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(a);
+const client=id=>S.clients.find(c=>c.id===id);
+const device=id=>S.devices.find(d=>d.id===id);
+const devLabel=d=>d?[d.brand,d.model,d.btu?d.btu+' BTU':''].filter(Boolean).join(' ')+(d.room?' — '+d.room:''):'';
+const JOB_TYPES=['Ugradnja','Servis','Popravka','Demontaža','Pregled / ponuda'];
+const BRANDS=['Gree','Midea','Daikin','Mitsubishi Electric','Mitsubishi Heavy','LG','Samsung','Vivax','Tesla','Fujitsu','Toshiba','Panasonic','Hisense','Haier','Bosch','Sinclair','Hyundai','Electrolux','Cooper&Hunter','Fujiko'];
+const BTUS=['7000','9000','12000','18000','24000','36000','48000'];
+function nextService(d){const base=d.lastService||d.installDate;return base?addMonths(base,d.serviceMonths||S.settings.serviceMonths||12):null}
+function warrantyEnd(d){return d.installDate&&+d.warrantyMonths?addMonths(d.installDate,d.warrantyMonths):null}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
+async function copy(text){try{await navigator.clipboard.writeText(text);return true}catch(e){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy')}catch(_){}ta.remove();return true}}
+function smsText(c,d){return (S.settings.sms||'').replace('{ime}',c?c.name:'').replace('{uredjaj}',devLabel(d)).replace('{firma}',S.settings.firm||'')}
+
+/* ---------- ruter ---------- */
+let jobFilter='upcoming',clientQuery='';
+function go(h){location.hash=h}
+window.addEventListener('hashchange',render);
+function header(title,{back,btn}={}){
+  document.getElementById('top').innerHTML=(back?`<button class="back" data-act="back" aria-label="Nazad">‹</button>`:'')+`<h1>${esc(title)}</h1>`+(btn||'');
+}
+function render(){
+  const [route,param]=(location.hash.slice(1)||'danas').split('/');
+  document.querySelectorAll('nav.tabs a').forEach(a=>a.classList.toggle('on',a.dataset.tab===route||(route==='klijent'&&a.dataset.tab==='klijenti')||(route==='ponuda'&&a.dataset.tab==='ponude')));
+  const m=document.getElementById('main');
+  const views={danas:vToday,poslovi:vJobs,klijenti:vClients,klijent:vClient,servisi:vServices,ponude:vQuotes,ponuda:vQuote,podesavanja:vSettings};
+  m.innerHTML=(views[route]||vToday)(param);
+  window.scrollTo(0,0);
+  if(route==='klijent')loadPhotos(param);
+}
+
+/* ---------- DANAS ---------- */
+function vToday(){
+  header(S.settings.firm||'Klima Majstor',{btn:`<button class="tbtn" data-act="go" data-h="podesavanja" aria-label="Podešavanja">⚙︎</button>`});
+  const t=today();
+  const upcoming=S.jobs.filter(j=>j.status==='zakazano'&&j.date>=t).sort((a,b)=>(a.date+(a.time||'99')).localeCompare(b.date+(b.time||'99')));
+  const late=S.jobs.filter(j=>j.status==='zakazano'&&j.date<t);
+  const next=upcoming[0];
+  const todayJobs=upcoming.filter(j=>j.date===t);
+  const ym=t.slice(0,7);
+  const doneMonth=S.jobs.filter(j=>j.status==='zavrseno'&&(j.date||'').startsWith(ym));
+  const earned=doneMonth.reduce((s,j)=>s+(+j.price||0),0);
+  const unpaid=S.jobs.filter(j=>j.status==='zavrseno'&&!j.paid&&+j.price>0);
+  const dueSoon=S.devices.filter(d=>{const n=nextService(d);return n&&n<=addDays(t,30)});
+  let h='';
+  if(!window.matchMedia('(display-mode: standalone)').matches&&!navigator.standalone&&!localStorage.getItem('hideHint'))
+    h+=`<div class="hint"><b>Dodaj aplikaciju na početni ekran</b>${isIOS?'U Safariju dodirni dugme Deli (kvadrat sa strelicom), pa „Dodaj na početni ekran”.':'U Chromeu otvori meni ⋮ i izaberi „Dodaj na početni ekran” ili „Instaliraj aplikaciju”.'} <a href="#" data-act="hideHint">Sakrij</a></div>`;
+  if(S.clients.length&&(!S.lastBackup||daysBetween(S.lastBackup,t)>14))
+    h+=`<div class="hint" style="background:var(--copper-soft)"><b>Napravi rezervnu kopiju</b>Podaci postoje samo na ovom telefonu. <a href="#" data-act="go" data-h="podesavanja">Sačuvaj kopiju</a></div>`;
+  if(next){
+    const c=client(next.clientId)||{};const d=device(next.deviceId);
+    h+=`<h2>Sledeći posao</h2><div class="plate">
+      <div class="ph"><span>${esc(next.type)}</span><span class="num">${esc(relDay(next.date))}${next.time?' u '+esc(next.time):''}</span></div>
+      <div class="pb" data-act="editJob" data-id="${next.id}" style="cursor:pointer"><div class="who">${esc(c.name||'Bez klijenta')}</div>
+      <dl>${c.address?`<dt>Adresa</dt><dd>${esc(c.address)}</dd>`:''}${c.phone?`<dt>Telefon</dt><dd class="num">${esc(c.phone)}</dd>`:''}${d?`<dt>Uređaj</dt><dd>${esc(devLabel(d))}</dd>`:''}${+next.price?`<dt>Cena</dt><dd class="num">${money(next.price)}</dd>`:''}${next.note?`<dt>Napomena</dt><dd>${esc(next.note)}</dd>`:''}</dl></div>
+      <div class="acts">${c.phone?`<a href="tel:${esc(intlPhone(c.phone))}">Pozovi</a>`:'<span></span>'}${c.address?`<a href="${mapLink(c.address)}" target="_blank" rel="noopener">Navigacija</a>`:'<span></span>'}<button data-act="finishJob" data-id="${next.id}">Završi</button></div>
+    </div>`;
+  }
+  h+=`<div class="quick"><button class="btn" data-act="newJob">+ Posao</button><button class="btn ghost" data-act="newClient">+ Klijent</button><button class="btn ghost" data-act="newQuote">+ Ponuda</button></div>`;
+  h+=`<h2>Ovaj mesec</h2><div class="stats">
+    <div class="stat" data-act="jobsFilter" data-f="done"><b>${doneMonth.length}</b><span>završenih</span></div>
+    <div class="stat" data-act="jobsFilter" data-f="done"><b>${new Intl.NumberFormat('sr-RS',{notation:earned>=1e6?'compact':'standard'}).format(earned)}</b><span>zarađeno, din</span></div>
+    <div class="stat ${unpaid.length?'warn':''}" data-act="jobsFilter" data-f="unpaid"><b>${unpaid.length}</b><span>nenaplaćeno</span></div></div>`;
+  if(late.length)h+=`<h2>Zaostali (prošao datum)</h2><div class="list">${late.map(jobRow).join('')}</div>`;
+  const rest=todayJobs.filter(j=>j!==next);
+  if(rest.length)h+=`<h2>Još danas</h2><div class="list">${rest.map(jobRow).join('')}</div>`;
+  const tomorrow=upcoming.filter(j=>j.date===addDays(t,1)&&j!==next);
+  if(tomorrow.length)h+=`<h2>Sutra</h2><div class="list">${tomorrow.map(jobRow).join('')}</div>`;
+  if(dueSoon.length)h+=`<h2>Servisi na redu</h2><div class="list">${dueSoon.sort((a,b)=>nextService(a).localeCompare(nextService(b))).slice(0,5).map(serviceRow).join('')}</div>${dueSoon.length>5?`<p style="text-align:center"><a href="#servisi">Svi servisi (${dueSoon.length})</a></p>`:''}`;
+  if(!S.jobs.length&&!S.clients.length)h+=`<div class="card" style="margin-top:16px"><b>Kako da počneš</b><p style="margin:6px 0 0;color:var(--muted)">Dodaj prvi posao — klijenta možeš da upišeš odmah u istom formularu. Kad završiš ugradnju, aplikacija pita da upiše uređaj i sama ga podseća kad mu ističe servis.</p></div>`;
+  return h;
+}
+
+/* ---------- POSLOVI ---------- */
+function jobRow(j){
+  const c=client(j.clientId)||{};const d=parse(j.date||today());
+  const st=j.status==='zavrseno'?(+j.price&&!j.paid?'<span class="tag copper">nenaplaćeno</span>':'<span class="tag green">završeno</span>'):j.status==='otkazano'?'<span class="tag gray">otkazano</span>':(j.date<today()?'<span class="tag copper">kasni</span>':'');
+  return `<div class="row" data-act="editJob" data-id="${j.id}">
+    <div class="when"><b>${d.getDate()}.</b><span>${MON[d.getMonth()]}</span></div>
+    <div class="main"><div class="t">${esc(c.name||'Bez klijenta')}</div><div class="s">${esc(j.type)}${j.time?' · '+esc(j.time):''}${c.address?' · '+esc(c.address):''}</div></div>
+    <div class="r">${+j.price?`<div class="num">${money(j.price)}</div>`:''}${st}</div></div>`;
+}
+function vJobs(){
+  header('Poslovi',{btn:`<button class="tbtn" data-act="newJob">+ Novi</button>`});
+  const t=today();let list;
+  if(jobFilter==='upcoming')list=S.jobs.filter(j=>j.status==='zakazano').sort((a,b)=>(a.date+(a.time||'99')).localeCompare(b.date+(b.time||'99')));
+  else if(jobFilter==='done')list=S.jobs.filter(j=>j.status!=='zakazano').sort((a,b)=>b.date.localeCompare(a.date));
+  else list=S.jobs.filter(j=>j.status==='zavrseno'&&!j.paid&&+j.price>0).sort((a,b)=>a.date.localeCompare(b.date));
+  let h=`<div class="seg">${[['upcoming','Zakazani'],['done','Završeni'],['unpaid','Nenaplaćeni']].map(([k,l])=>`<button class="${jobFilter===k?'on':''}" data-act="jobsFilter" data-f="${k}">${l}</button>`).join('')}</div>`;
+  if(jobFilter==='unpaid'&&list.length)h+=`<div class="card" style="margin-bottom:12px">Ukupno da se naplati: <b class="num">${money(list.reduce((s,j)=>s+(+j.price||0),0))}</b></div>`;
+  if(!list.length)return h+`<div class="list"><div class="empty">${jobFilter==='upcoming'?'Nema zakazanih poslova.<br><br><button class="btn" data-act="newJob">Zakaži posao</button>':jobFilter==='done'?'Još nema završenih poslova.':'Sve je naplaćeno.'}</div></div>`;
+  // grupisanje po danu
+  let cur='';let open=false;
+  for(const j of list){
+    const key=jobFilter==='upcoming'&&j.date<t?'Zaostali':relDay(j.date);
+    if(key!==cur){if(open)h+='</div>';h+=`<h2>${esc(key)}</h2><div class="list">`;cur=key;open=true}
+    h+=jobRow(j);
+  }
+  return h+(open?'</div>':'');
+}
+
+/* ---------- KLIJENTI ---------- */
+function vClients(){
+  header('Klijenti',{btn:`<button class="tbtn" data-act="newClient">+ Novi</button>`});
+  const q=clientQuery.toLowerCase();
+  const list=S.clients.filter(c=>!q||[c.name,c.phone,c.address].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'sr'));
+  let h=`<input class="search" type="search" placeholder="Traži ime, telefon ili adresu" value="${esc(clientQuery)}" data-input="clientSearch">`;
+  if(!S.clients.length)return h+`<div class="list"><div class="empty">Još nema klijenata.<br><br><button class="btn" data-act="newClient">Dodaj klijenta</button></div></div>`;
+  h+=`<div class="list" id="clist">${list.map(c=>{const n=S.devices.filter(d=>d.clientId===c.id).length;return `<a class="row" href="#klijent/${c.id}"><div class="main"><div class="t">${esc(c.name)}</div><div class="s">${esc([c.phone,c.address].filter(Boolean).join(' · '))}</div></div><div class="r">${n?n+(n===1?' klima':' klime'):''}</div></a>`}).join('')||'<div class="empty">Nema rezultata.</div>'}</div>`;
+  return h;
+}
+function vClient(id){
+  const c=client(id);if(!c){go('klijenti');return ''}
+  header(c.name,{back:true,btn:`<button class="tbtn" data-act="editClient" data-id="${c.id}">Izmeni</button>`});
+  const devs=S.devices.filter(d=>d.clientId===id);
+  const jobs=S.jobs.filter(j=>j.clientId===id).sort((a,b)=>b.date.localeCompare(a.date));
+  const quotes=S.quotes.filter(q=>q.clientId===id).sort((a,b)=>b.date.localeCompare(a.date));
+  const tel=intlPhone(c.phone);
+  let h=`<div class="card contact"><div class="name">${esc(c.name)}</div><div class="meta">${esc([c.phone,c.address].filter(Boolean).join(' · '))||'Nema kontakt podataka'}</div>
+    <div class="acts">${c.phone?`<a class="btn" href="tel:${esc(tel)}">Pozovi</a><a class="btn ghost" href="viber://chat?number=${encodeURIComponent(tel)}">Viber</a>`:'<span></span><span></span>'}${c.address?`<a class="btn ghost" href="${mapLink(c.address)}" target="_blank" rel="noopener">Mapa</a>`:''}</div>
+    ${c.note?`<div class="note">${esc(c.note)}</div>`:''}</div>`;
+  h+=`<h2>Uređaji</h2><div class="list">${devs.map(d=>{const n=nextService(d);const w=warrantyEnd(d);const late=n&&n<today();
+     return `<div class="row" data-act="editDevice" data-id="${d.id}"><div class="main"><div class="t">${esc(devLabel(d)||'Uređaj')}</div><div class="s">Ugrađena ${esc(fmtDate(d.installDate)||'—')}${w?' · garancija do '+esc(fmtDate(w)):''}</div></div><div class="r">${n?`<span class="tag ${late?'copper':''}">servis ${esc(fmtDate(n))}</span>`:''}</div></div>`}).join('')}
+    <div class="row" data-act="newDevice" data-cid="${id}" style="color:var(--blue);font-weight:600">+ Dodaj uređaj</div></div>`;
+  h+=`<div class="btns" style="margin-top:12px"><button class="btn small" data-act="newJob" data-cid="${id}">+ Posao</button><button class="btn small ghost" data-act="newQuote" data-cid="${id}">+ Ponuda</button></div>`;
+  if(jobs.length)h+=`<h2>Poslovi</h2><div class="list">${jobs.map(jobRow).join('')}</div>`;
+  if(quotes.length)h+=`<h2>Ponude</h2><div class="list">${quotes.map(quoteRow).join('')}</div>`;
+  h+=`<h2>Slike</h2><div class="photos" id="photos"><label>+ Slika<input type="file" accept="image/*" multiple hidden data-change="addPhoto" data-cid="${id}"></label></div>`;
+  return h;
+}
+async function loadPhotos(cid){
+  const box=document.getElementById('photos');if(!box)return;
+  const ph=(await photosOf(cid)).sort((a,b)=>b.date-a.date);
+  ph.forEach(p=>{const img=document.createElement('img');img.src=p.data;img.alt='Slika sa terena';img.dataset.act='viewPhoto';img.dataset.id=p.id;img.loading='lazy';box.appendChild(img)});
+  PHOTO_CACHE=ph;
+}
+let PHOTO_CACHE=[];
+function compress(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>{const img=new Image();img.onload=()=>{const max=1400;let{width:w,height:h}=img;if(w>max||h>max){const k=max/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);res(cv.toDataURL('image/jpeg',.72))};img.onerror=rej;img.src=fr.result};fr.onerror=rej;fr.readAsDataURL(file)})}
+
+/* ---------- SERVISI ---------- */
+function serviceRow(d){
+  const c=client(d.clientId)||{};const n=nextService(d);const diff=daysBetween(today(),n);
+  const label=diff<0?`kasni ${-diff} d`:diff===0?'danas':`za ${diff} d`;
+  return `<div class="row" data-act="serviceMenu" data-id="${d.id}"><div class="main"><div class="t">${esc(c.name||'—')}</div><div class="s">${esc(devLabel(d))}</div></div><div class="r"><div class="num">${esc(fmtDate(n))}</div><span class="tag ${diff<0?'copper':''}">${label}</span></div></div>`;
+}
+function vServices(){
+  header('Servisi');
+  const t=today();
+  const all=S.devices.filter(d=>nextService(d)).sort((a,b)=>nextService(a).localeCompare(nextService(b)));
+  if(!all.length)return `<div class="list"><div class="empty">Ovde se pojavljuju klime kojima ističe redovan servis. Dodaj uređaj kod klijenta (datum ugradnje ili poslednjeg servisa) i aplikacija sama računa kad je sledeći.</div></div>`;
+  const late=all.filter(d=>nextService(d)<t),soon=all.filter(d=>{const n=nextService(d);return n>=t&&n<=addDays(t,30)}),later=all.filter(d=>nextService(d)>addDays(t,30));
+  let h='<p style="color:var(--muted);font-size:14px;margin:0 4px 8px">Dodirni klimu da pozoveš klijenta, pošalješ poruku ili zakažeš servis.</p>';
+  if(late.length)h+=`<h2>Prošao rok</h2><div class="list">${late.map(serviceRow).join('')}</div>`;
+  if(soon.length)h+=`<h2>U narednih 30 dana</h2><div class="list">${soon.map(serviceRow).join('')}</div>`;
+  if(later.length)h+=`<h2>Kasnije</h2><div class="list">${later.slice(0,50).map(serviceRow).join('')}</div>`;
+  return h;
+}
+
+/* ---------- PONUDE ---------- */
+const qTotal=q=>(q.items||[]).reduce((s,i)=>s+(+i.qty||0)*(+i.price||0),0);
+function quoteRow(q){const c=client(q.clientId);return `<a class="row" href="#ponuda/${q.id}"><div class="main"><div class="t">${esc(c?c.name:q.clientName||'Bez klijenta')}</div><div class="s">${esc(fmtDate(q.date))}${q.jobId?' · zakazano':''}</div></div><div class="r num">${money(qTotal(q))}</div></a>`}
+function vQuotes(){
+  header('Ponude',{btn:`<button class="tbtn" data-act="newQuote">+ Nova</button>`});
+  const list=[...S.quotes].sort((a,b)=>b.date.localeCompare(a.date)||b.updated-a.updated);
+  if(!list.length)return `<div class="list"><div class="empty">Napravi ponudu iz cenovnika za par sekundi i pošalji je klijentu porukom ili kao PDF.<br><br><button class="btn" data-act="newQuote">Nova ponuda</button></div></div>`;
+  return `<div class="list">${list.map(quoteRow).join('')}</div>`;
+}
+function quoteText(q){
+  const c=client(q.clientId);const st=S.settings;
+  let t=`PONUDA${st.firm?' — '+st.firm:''}\n`;
+  if(c||q.clientName)t+=`Za: ${c?c.name:q.clientName}\n`;
+  t+=`Datum: ${fmtDate(q.date)}\n\n`;
+  (q.items||[]).forEach(i=>{const s=(+i.qty||0)*(+i.price||0);t+=`• ${i.name}${+i.qty!==1?` × ${i.qty}`:''}: ${money(s)}\n`});
+  t+=`\nUKUPNO: ${money(qTotal(q))}\n`;
+  if(q.note)t+=`\n${q.note}\n`;
+  if(st.phone)t+=`\nKontakt: ${st.phone}`;
+  return t;
+}
+function vQuote(id){
+  const q=S.quotes.find(x=>x.id===id);if(!q){go('ponude');return ''}
+  const c=client(q.clientId);
+  header('Ponuda',{back:true,btn:`<button class="tbtn" data-act="editQuote" data-id="${q.id}">Izmeni</button>`});
+  let h=`<div class="plate"><div class="ph"><span>Ponuda</span><span>${esc(fmtDate(q.date))}</span></div><div class="pb">
+    <div class="who">${esc(c?c.name:q.clientName||'Bez klijenta')}</div><dl>`;
+  (q.items||[]).forEach(i=>{h+=`<dt>${esc(i.name)}${+i.qty!==1?' × '+esc(i.qty):''}</dt><dd class="num" style="text-align:right">${money((+i.qty||0)*(+i.price||0))}</dd>`});
+  h+=`</dl><div class="qtotal"><span>Ukupno</span><span class="num">${money(qTotal(q))}</span></div>${q.note?`<div class="note" style="margin:0 0 12px">${esc(q.note)}</div>`:''}</div>
+    <div class="acts"><button data-act="shareQuote" data-id="${q.id}">Pošalji</button><button data-act="printQuote" data-id="${q.id}">PDF</button><button data-act="quoteToJob" data-id="${q.id}">Zakaži</button></div></div>`;
+  if(c)h+=`<p style="text-align:center;margin-top:18px"><a href="#klijent/${c.id}">Otvori klijenta</a></p>`;
+  return h;
+}
+
+/* ---------- PODEŠAVANJA ---------- */
+function vSettings(){
+  header('Podešavanja',{back:true});
+  const s=S.settings;
+  return `<form data-submit="saveSettings">
+    <div class="f"><span>Naziv firme</span><input name="firm" value="${esc(s.firm)}" placeholder="npr. Klima Servis Marko"></div>
+    <div class="f"><span>Tvoj telefon (ide u ponude)</span><input name="phone" type="tel" value="${esc(s.phone)}"></div>
+    <div class="two"><label class="f"><span>Garancija (meseci)</span><input name="warranty" type="number" inputmode="numeric" value="${esc(s.warranty)}"></label>
+    <label class="f"><span>Servis na (meseci)</span><input name="serviceMonths" type="number" inputmode="numeric" value="${esc(s.serviceMonths)}"></label></div>
+    <label class="f"><span>Cenovnik — jedna stavka po redu: naziv = cena</span><textarea name="prices" rows="8">${esc(s.prices.map(p=>p[0]+' = '+p[1]).join('\n'))}</textarea></label>
+    <label class="f"><span>Poruka za podsetnik o servisu ({ime}, {uredjaj}, {firma})</span><textarea name="sms" rows="4">${esc(s.sms)}</textarea></label>
+    <button class="btn wide">Sačuvaj podešavanja</button></form>
+    <h2>Rezervna kopija</h2>
+    <div class="card"><p style="margin:0 0 10px;color:var(--muted);font-size:15px">Svi podaci i slike su samo na ovom telefonu. Kopiju sačuvaj u Fajlove, na Google Drive ili pošalji sebi mejlom.${S.lastBackup?' Poslednja kopija: '+esc(fmtDate(S.lastBackup))+'.':''}</p>
+    <div class="btns"><button class="btn" data-act="exportData">Sačuvaj kopiju</button><label class="btn ghost">Vrati iz kopije<input type="file" accept=".json,application/json" hidden data-change="importData"></label></div></div>
+    <h2>Opasna zona</h2><button class="btn danger wide" data-act="wipe">Obriši sve podatke</button>
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · radi bez interneta</p>`;
+}
+
+/* ---------- forme (sheet) ---------- */
+function sheet(title,html,onSubmit,{onOpen}={}){
+  const v=document.createElement('div');v.className='veil';
+  v.innerHTML=`<div class="sheet" role="dialog" aria-label="${esc(title)}"><div class="sh"><h3>${esc(title)}</h3><button class="x" type="button" aria-label="Zatvori">✕</button></div><form>${html}</form></div>`;
+  document.body.appendChild(v);
+  const close=()=>v.remove();
+  v.querySelector('.x').onclick=close;
+  v.addEventListener('click',e=>{if(e.target===v)close()});
+  const form=v.querySelector('form');
+  form.addEventListener('submit',async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(form));form.querySelectorAll('input[type=checkbox]').forEach(cb=>data[cb.name]=cb.checked);
+    const r=await onSubmit(data,form);if(r!==false){close();render()}});
+  if(onOpen)onOpen(form,close);
+  return {form,close};
+}
+const field=(label,name,val='',type='text',extra='')=>`<label class="f"><span>${label}</span><input name="${name}" type="${type}" value="${esc(val)}" ${extra}></label>`;
+const area=(label,name,val='')=>`<label class="f"><span>${label}</span><textarea name="${name}">${esc(val)}</textarea></label>`;
+
+function clientForm(c={},after){
+  const isNew=!c.id;
+  sheet(isNew?'Novi klijent':'Izmeni klijenta',
+    field('Ime i prezime','name',c.name,'text','required autocomplete="off"')+field('Telefon','phone',c.phone,'tel')+field('Adresa','address',c.address)+area('Napomena (sprat, interfon, šifra...)','note',c.note)+
+    `<button class="btn wide">Sačuvaj</button>`+(isNew?'':`<button type="button" class="btn danger wide" style="margin-top:10px" data-del>Obriši klijenta</button>`),
+    async d=>{const o={...c,...d,id:c.id||uid()};await save('clients',o);toast('Klijent sačuvan');if(after)after(o);else if(isNew)go('klijent/'+o.id)},
+    {onOpen:(f,close)=>{const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati klijenta i sve njegove uređaje, poslove i slike?'))return;
+      for(const d of S.devices.filter(x=>x.clientId===c.id))await remove('devices',d.id);
+      for(const j of S.jobs.filter(x=>x.clientId===c.id))await remove('jobs',j.id);
+      for(const q of S.quotes.filter(x=>x.clientId===c.id))await remove('quotes',q.id);
+      for(const p of await photosOf(c.id))await dbDel('photos',p.id);
+      await remove('clients',c.id);close();go('klijenti');toast('Klijent obrisan')}}});
+}
+
+function deviceForm(d={},cid,after){
+  const isNew=!d.id;const st=S.settings;
+  d={warrantyMonths:st.warranty,serviceMonths:st.serviceMonths,installDate:today(),...d};
+  sheet(isNew?'Novi uređaj':'Izmeni uređaj',
+    `<datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>`+
+    `<div class="two">${field('Marka','brand',d.brand,'text','list="brands" autocomplete="off"')}<label class="f"><span>Snaga</span><select name="btu"><option value="">—</option>${BTUS.map(b=>`<option ${String(d.btu)===b?'selected':''} value="${b}">${b} BTU</option>`).join('')}</select></label></div>`+
+    field('Model','model',d.model)+field('Prostorija (dnevna, spavaća...)','room',d.room)+
+    `<div class="two">${field('Datum ugradnje','installDate',d.installDate,'date')}${field('Poslednji servis','lastService',d.lastService,'date')}</div>`+
+    `<div class="two">${field('Garancija (meseci)','warrantyMonths',d.warrantyMonths,'number','inputmode="numeric"')}${field('Servis na (meseci)','serviceMonths',d.serviceMonths,'number','inputmode="numeric"')}</div>`+
+    area('Napomena (freon, dužina instalacije...)','note',d.note)+
+    `<button class="btn wide">Sačuvaj</button>`+(isNew?'':`<button type="button" class="btn danger wide" style="margin-top:10px" data-del>Obriši uređaj</button>`),
+    async v=>{const o={...d,...v,clientId:d.clientId||cid,id:d.id||uid()};await save('devices',o);toast('Uređaj sačuvan');if(after)after(o)},
+    {onOpen:(f,close)=>{const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati uređaj?'))return;await remove('devices',d.id);close();render()}}});
+}
+
+function jobForm(j={},opts={}){
+  const isNew=!j.id;
+  j={type:'Ugradnja',date:today(),status:'zakazano',...j};
+  const clients=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'sr'));
+  const devOpts=cid=>`<option value="">—</option>`+S.devices.filter(d=>d.clientId===cid).map(d=>`<option value="${d.id}" ${d.id===j.deviceId?'selected':''}>${esc(devLabel(d))}</option>`).join('');
+  sheet(isNew?'Novi posao':'Posao',
+    `<label class="f"><span>Klijent</span><select name="clientId">${clients.length?'':'<option value="__new">+ Novi klijent</option>'}${clients.map(c=>`<option value="${c.id}" ${c.id===j.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}${clients.length?'<option value="__new">+ Novi klijent</option>':''}</select></label>
+    <fieldset data-newc ${clients.length?'hidden':''}>${field('Ime i prezime','nc_name')}${field('Telefon','nc_phone','','tel')}${field('Adresa','nc_address')}</fieldset>
+    <label class="f"><span>Vrsta posla</span><select name="type">${JOB_TYPES.map(t=>`<option ${t===j.type?'selected':''}>${t}</option>`).join('')}</select></label>
+    <div class="two">${field('Datum','date',j.date,'date','required')}${field('Vreme','time',j.time,'time')}</div>
+    <label class="f" data-devwrap><span>Uređaj</span><select name="deviceId">${devOpts(j.clientId||(clients[0]||{}).id)}</select></label>
+    <div class="two">${field('Cena (din)','price',j.price,'number','inputmode="numeric"')}<label class="f"><span>Status</span><select name="status"><option value="zakazano" ${j.status==='zakazano'?'selected':''}>Zakazano</option><option value="zavrseno" ${j.status==='zavrseno'?'selected':''}>Završeno</option><option value="otkazano" ${j.status==='otkazano'?'selected':''}>Otkazano</option></select></label></div>
+    <label class="chk"><input type="checkbox" name="paid" ${j.paid?'checked':''}> Naplaćeno</label>
+    ${area('Napomena','note',j.note)}
+    <button class="btn wide">Sačuvaj</button>
+    ${isNew?'':`<div class="btns" style="margin-top:10px"><button type="button" class="btn ghost" style="flex:1" data-open>Otvori klijenta</button><button type="button" class="btn danger" style="flex:1" data-del>Obriši</button></div>`}`,
+    async v=>{
+      let cid=v.clientId;
+      if(cid==='__new'){if(!v.nc_name){toast('Upiši ime klijenta');return false}const c={id:uid(),name:v.nc_name,phone:v.nc_phone,address:v.nc_address};await save('clients',c);cid=c.id}
+      const wasDone=j.status==='zavrseno';
+      const o={...j,id:j.id||uid(),clientId:cid,type:v.type,date:v.date,time:v.time,deviceId:v.deviceId,price:v.price,status:v.status,paid:v.paid,note:v.note,quoteId:j.quoteId};
+      await save('jobs',o);
+      if(o.quoteId){const q=S.quotes.find(x=>x.id===o.quoteId);if(q&&!q.jobId){q.jobId=o.id;await save('quotes',q)}}
+      toast('Posao sačuvan');
+      if(!wasDone&&o.status==='zavrseno')setTimeout(()=>afterFinish(o),50);
+    },
+    {onOpen:(f,close)=>{
+      const sel=f.querySelector('[name=clientId]'),fs=f.querySelector('[data-newc]'),ds=f.querySelector('[name=deviceId]');
+      sel.onchange=()=>{fs.hidden=sel.value!=='__new';ds.innerHTML=devOpts(sel.value)};
+      const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati posao?'))return;await remove('jobs',j.id);close();render();toast('Posao obrisan')};
+      const op=f.querySelector('[data-open]');if(op)op.onclick=()=>{close();go('klijent/'+j.clientId)};
+    }});
+}
+async function finishJob(id){
+  const j=S.jobs.find(x=>x.id===id);if(!j)return;
+  const paid=+j.price?confirm(`Završen posao. Da li je naplaćeno ${money(j.price)}?`):j.paid;
+  j.status='zavrseno';j.paid=paid;await save('jobs',j);toast('Posao završen');render();afterFinish(j);
+}
+async function afterFinish(j){
+  if(j.type==='Servis'&&j.deviceId){const d=device(j.deviceId);if(d){d.lastService=j.date;await save('devices',d);toast('Servis upisan — sledeći za '+(d.serviceMonths||12)+' meseci')}}
+  else if(j.type==='Ugradnja'&&!j.deviceId){if(confirm('Upisati ugrađenu klimu kod klijenta? Tako ti aplikacija javlja kad je vreme za servis.'))deviceForm({installDate:j.date},j.clientId,async d=>{j.deviceId=d.id;await save('jobs',j);render()})}
+}
+
+function quoteForm(q={}){
+  const isNew=!q.id;
+  q={date:today(),items:[],...q};
+  const clients=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'sr'));
+  const itemRow=(i={name:'',qty:1,price:''})=>`<div class="qi"><input data-k="name" placeholder="Stavka" value="${esc(i.name)}"><input data-k="qty" type="number" inputmode="decimal" value="${esc(i.qty)}" aria-label="Količina"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena" value="${esc(i.price)}" aria-label="Cena"><button type="button" class="rm" aria-label="Ukloni">×</button></div>`;
+  sheet(isNew?'Nova ponuda':'Izmeni ponudu',
+    `<label class="f"><span>Klijent</span><select name="clientId"><option value="">— samo ime —</option>${clients.map(c=>`<option value="${c.id}" ${c.id===q.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+    <div data-cname ${q.clientId?'hidden':''}>${field('Ime (ako nije u klijentima)','clientName',q.clientName)}</div>
+    ${field('Datum','date',q.date,'date')}
+    <div class="f"><span>Stavke — dodirni iz cenovnika ili upiši</span></div>
+    <div class="presets"><button type="button" data-p="__dev">+ Klima uređaj</button>${S.settings.prices.map((p,i)=>`<button type="button" data-p="${i}">${esc(p[0])}</button>`).join('')}</div>
+    <div data-items>${(q.items.length?q.items:[]).map(itemRow).join('')}</div>
+    <button type="button" class="btn ghost small" data-add>+ Prazna stavka</button>
+    <div class="qtotal"><span>Ukupno</span><span class="num" data-total>0 din</span></div>
+    ${area('Napomena (rok, garancija, uslovi plaćanja)','note',q.note)}
+    <button class="btn wide">Sačuvaj ponudu</button>
+    ${isNew?'':'<button type="button" class="btn danger wide" style="margin-top:10px" data-del>Obriši ponudu</button>'}`,
+    async (v,f)=>{
+      const items=[...f.querySelectorAll('.qi')].map(r=>({name:r.querySelector('[data-k=name]').value.trim(),qty:+r.querySelector('[data-k=qty]').value||1,price:+r.querySelector('[data-k=price]').value||0})).filter(i=>i.name||i.price);
+      if(!items.length){toast('Dodaj bar jednu stavku');return false}
+      const o={...q,id:q.id||uid(),clientId:v.clientId,clientName:v.clientId?'':v.clientName,date:v.date,note:v.note,items};
+      await save('quotes',o);toast('Ponuda sačuvana');go('ponuda/'+o.id);
+    },
+    {onOpen:(f,close)=>{
+      const box=f.querySelector('[data-items]'),tot=f.querySelector('[data-total]');
+      const recalc=()=>{let s=0;box.querySelectorAll('.qi').forEach(r=>s+=(+r.querySelector('[data-k=qty]').value||0)*(+r.querySelector('[data-k=price]').value||0));tot.textContent=money(s)};
+      const add=i=>{box.insertAdjacentHTML('beforeend',itemRow(i));recalc();const last=box.lastElementChild;if(!i.name)last.querySelector('input').focus()};
+      box.addEventListener('input',recalc);
+      box.addEventListener('click',e=>{if(e.target.classList.contains('rm')){e.target.closest('.qi').remove();recalc()}});
+      f.querySelector('[data-add]').onclick=()=>add({name:'',qty:1,price:''});
+      f.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(b.dataset.p==='__dev'){add({name:'Klima uređaj ',qty:1,price:''});const inp=box.lastElementChild.querySelector('input');inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);return}
+        const p=S.settings.prices[+b.dataset.p];const ex=[...box.querySelectorAll('.qi')].find(r=>r.querySelector('[data-k=name]').value===p[0]);
+        if(ex){const qi=ex.querySelector('[data-k=qty]');qi.value=(+qi.value||0)+1;recalc()}else add({name:p[0],qty:1,price:p[1]})});
+      const sel=f.querySelector('[name=clientId]'),cn=f.querySelector('[data-cname]');sel.onchange=()=>cn.hidden=!!sel.value;
+      const d=f.querySelector('[data-del]');if(d)d.onclick=async()=>{if(!confirm('Obrisati ponudu?'))return;await remove('quotes',q.id);close();go('ponude')};
+      recalc();
+    }});
+}
+
+function serviceMenu(d){
+  const c=client(d.clientId)||{};const msg=smsText(c,d);const tel=intlPhone(c.phone);
+  const s=sheet(c.name||'Servis',
+    `<div class="card" style="margin-bottom:12px"><b>${esc(devLabel(d))}</b><div style="color:var(--muted);font-size:14px">Sledeći servis: ${esc(fmtDate(nextService(d)))}${d.lastService?' · poslednji '+esc(fmtDate(d.lastService)):''}</div></div>
+    ${c.phone?`<div class="btns" style="margin-bottom:10px"><a class="btn" style="flex:1" href="tel:${esc(tel)}">Pozovi</a><a class="btn ghost" style="flex:1" href="${esc(smsLink(c.phone,msg))}">SMS</a><a class="btn ghost" style="flex:1" href="viber://chat?number=${encodeURIComponent(tel)}" data-viber>Viber</a></div>
+    <p style="font-size:13px;color:var(--muted);margin:0 2px 12px">Za Viber se poruka kopira — samo je nalepi.</p>`:'<p class="empty">Klijent nema upisan telefon.</p>'}
+    <button type="button" class="btn copper wide" data-sched>Zakaži servis</button>
+    <button type="button" class="btn ghost wide" style="margin-top:10px" data-done>Servis je već urađen danas</button>
+    <button type="button" class="btn ghost wide" style="margin-top:10px" data-open>Otvori klijenta</button>`,
+    ()=>{},
+    {onOpen:(f,close)=>{
+      const v=f.querySelector('[data-viber]');if(v)v.addEventListener('click',()=>copy(msg));
+      f.querySelector('[data-sched]').onclick=()=>{close();jobForm({clientId:d.clientId,deviceId:d.id,type:'Servis',price:(S.settings.prices.find(p=>/servis/i.test(p[0]))||[])[1]||''})};
+      f.querySelector('[data-done]').onclick=async()=>{d.lastService=today();await save('devices',d);close();render();toast('Upisan servis')};
+      f.querySelector('[data-open]').onclick=()=>{close();go('klijent/'+d.clientId)};
+    }});
+}
+
+/* ---------- akcije ---------- */
+const A={
+  back:()=>history.length>1?history.back():go('danas'),
+  go:el=>go(el.dataset.h),
+  hideHint:()=>{localStorage.setItem('hideHint','1');render()},
+  newJob:el=>jobForm({clientId:el.dataset.cid}),
+  editJob:el=>jobForm(S.jobs.find(j=>j.id===el.dataset.id)),
+  finishJob:el=>finishJob(el.dataset.id),
+  jobsFilter:el=>{jobFilter=el.dataset.f;if(location.hash!=='#poslovi')go('poslovi');else render()},
+  newClient:()=>clientForm(),
+  editClient:el=>clientForm(client(el.dataset.id)),
+  newDevice:el=>deviceForm({},el.dataset.cid,()=>render()),
+  editDevice:el=>deviceForm(device(el.dataset.id),null,()=>render()),
+  serviceMenu:el=>serviceMenu(device(el.dataset.id)),
+  newQuote:el=>quoteForm({clientId:el.dataset.cid}),
+  editQuote:el=>quoteForm(S.quotes.find(q=>q.id===el.dataset.id)),
+  shareQuote:async el=>{const t=quoteText(S.quotes.find(q=>q.id===el.dataset.id));
+    if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{await copy(t);toast('Ponuda kopirana — nalepi je u poruku')}},
+  printQuote:el=>{const q=S.quotes.find(x=>x.id===el.dataset.id);const c=client(q.clientId);const st=S.settings;
+    document.getElementById('print').innerHTML=`<h1 style="margin:0">${esc(st.firm||'Ponuda')}</h1>${st.phone?`<div>${esc(st.phone)}</div>`:''}<h2 style="margin-top:24px">Ponuda</h2><div>Za: <b>${esc(c?c.name:q.clientName||'')}</b>${c&&c.address?', '+esc(c.address):''}</div><div>Datum: ${esc(fmtDate(q.date))}</div>
+    <table><tr><th>Stavka</th><th class="r">Kol.</th><th class="r">Cena</th><th class="r">Iznos</th></tr>${q.items.map(i=>`<tr><td>${esc(i.name)}</td><td class="r">${esc(i.qty)}</td><td class="r">${money(i.price)}</td><td class="r">${money(i.qty*i.price)}</td></tr>`).join('')}
+    <tr><td colspan="3"><b>Ukupno</b></td><td class="r"><b>${money(qTotal(q))}</b></td></tr></table>${q.note?`<p style="white-space:pre-wrap">${esc(q.note)}</p>`:''}`;
+    window.print()},
+  quoteToJob:el=>{const q=S.quotes.find(x=>x.id===el.dataset.id);
+    if(q.jobId&&S.jobs.find(j=>j.id===q.jobId)){jobForm(S.jobs.find(j=>j.id===q.jobId));return}
+    if(!q.clientId){toast('Prvo izaberi klijenta u ponudi (Izmeni)');return}
+    jobForm({clientId:q.clientId,price:qTotal(q),quoteId:q.id,note:q.items.map(i=>i.name+(i.qty!==1?' ×'+i.qty:'')).join(', ')})},
+  viewPhoto:el=>{const p=PHOTO_CACHE.find(x=>x.id===el.dataset.id);if(!p)return;
+    const v=document.createElement('div');v.className='viewer';v.innerHTML=`<div class="vb"><button class="btn danger small" style="color:#ff8a80;border-color:#444">Obriši</button><button class="btn small ghost">Zatvori</button></div><img src="${p.data}" alt="Slika">`;
+    document.body.appendChild(v);const[del,cl]=v.querySelectorAll('button');cl.onclick=()=>v.remove();
+    del.onclick=async()=>{if(!confirm('Obrisati sliku?'))return;await dbDel('photos',p.id);v.remove();render()}},
+  exportData:async()=>{
+    const data={app:'klima-majstor',version:1,date:new Date().toISOString()};
+    for(const s of STORES)data[s]=await dbAll(s);
+    const name='klima-kopija-'+today()+'.json';
+    const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+    const file=new File([blob],name,{type:'application/json'});
+    let ok=false;
+    if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});ok=true}catch(e){if(e.name==='AbortError')return}}
+    if(!ok){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+    S.lastBackup=today();await dbPut('meta',{id:'lastBackup',value:S.lastBackup});toast('Kopija napravljena');render()},
+  wipe:async()=>{if(!confirm('Obrisati SVE klijente, poslove, uređaje, ponude i slike?'))return;if(!confirm('Sigurno? Ovo se ne može vratiti bez rezervne kopije.'))return;
+    for(const s of STORES)await dbClear(s);await load();toast('Sve obrisano');go('danas')}
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;if(el.tagName!=='A'||el.getAttribute('href')==='#')e.preventDefault();const f=A[el.dataset.act];if(f)f(el,e)});
+document.addEventListener('input',e=>{if(e.target.dataset.input==='clientSearch'){clientQuery=e.target.value;const pos=e.target.selectionStart;render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(pos,pos)}});
+document.addEventListener('change',async e=>{const t=e.target;
+  if(t.dataset.change==='addPhoto'){const files=[...t.files];if(!files.length)return;toast('Čuvam '+(files.length>1?files.length+' slike':'sliku')+'…');
+    for(const f of files){try{const data=await compress(f);await dbPut('photos',{id:uid(),clientId:t.dataset.cid,data,date:Date.now()})}catch(err){toast('Slika nije sačuvana: format nije podržan')}}render()}
+  if(t.dataset.change==='importData'){const f=t.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(data.app!=='klima-majstor')throw new Error();
+    if(!confirm('Zameniti trenutne podatke podacima iz kopije od '+fmtDate(data.date.slice(0,10))+'?'))return;
+    for(const s of STORES){await dbClear(s);for(const o of data[s]||[])await dbPut(s,o)}await load();toast('Podaci vraćeni');go('danas')}catch(err){toast('Ovo nije ispravan fajl kopije')}}
+});
+document.addEventListener('submit',async e=>{const f=e.target;if(f.dataset.submit!=='saveSettings')return;e.preventDefault();const d=Object.fromEntries(new FormData(f));
+  const prices=d.prices.split('\n').map(l=>l.split('=')).filter(p=>p[0].trim()).map(p=>[p[0].trim(),+(p[1]||'').replace(/[^\d]/g,'')||0]);
+  S.settings={...S.settings,firm:d.firm.trim(),phone:d.phone.trim(),warranty:+d.warranty||0,serviceMonths:+d.serviceMonths||12,prices,sms:d.sms};
+  await dbPut('meta',S.settings);toast('Podešavanja sačuvana');render()});
+
+/* ---------- start ---------- */
+(async()=>{
+  DB=await openDB();await load();
+  if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+  render();
+  if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>

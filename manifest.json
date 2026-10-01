@@ -1,0 +1,17 @@
+{
+  "name": "Klima Majstor",
+  "short_name": "Klima",
+  "description": "Klijenti, poslovi, servisi i ponude za majstora za klime",
+  "lang": "sr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef2f5",
+  "theme_color": "#14324f",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
