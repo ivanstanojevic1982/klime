@@ -155,6 +155,10 @@ fieldset[hidden]{display:none}
 .wchip:has(input:checked){border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
 .muted{color:var(--muted);font-size:14px}
 a.row.card{padding:12px 14px}
+.calc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:4px 0 12px;font-size:15px}
+.calc:empty{display:none}
+.calc div{display:flex;justify-content:space-between;padding:3px 0}
+.calc .tot{border-top:1px solid var(--line);margin-top:4px;padding-top:6px;font-weight:700}
 .presets{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
 .presets button{border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:6px 11px;font-size:13px;cursor:pointer}
 
@@ -465,6 +469,9 @@ function vQuote(id){
 }
 
 /* ---------- PODEŠAVANJA ---------- */
+const qItemRow=(i={name:'',qty:1,price:''})=>`<div class="qi"><input data-k="name" placeholder="Stavka" value="${esc(i.name)}"><input data-k="qty" type="number" inputmode="decimal" value="${esc(i.qty)}" aria-label="Količina"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena" value="${esc(i.price)}" aria-label="Cena"><button type="button" class="rm" aria-label="Ukloni">×</button></div>`;
+const itemsSum=box=>{let t=0;box.querySelectorAll('.qi').forEach(r=>t+=(+r.querySelector('[data-k=qty]').value||0)*(+r.querySelector('[data-k=price]').value||0));return t};
+const readItems=box=>[...box.querySelectorAll('.qi')].map(r=>({name:r.querySelector('[data-k=name]').value.trim(),qty:+r.querySelector('[data-k=qty]').value||1,price:+r.querySelector('[data-k=price]').value||0})).filter(i=>i.name||i.price);
 const rowType=(t=['',''])=>`<div class="lr"><input data-k="name" placeholder="Naziv posla" value="${esc(t[0])}"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena" value="${esc(t[1]||'')}"><button type="button" class="rm" data-act="rmRow" aria-label="Ukloni">×</button></div>`;
 const rowCat=(c={})=>`<div class="lr cat"><div class="bsel">${(()=>{const L=brandList();const known=!c.brand||L.includes(c.brand);return `<select data-bs><option value="">Marka…</option>${L.map(b=>`<option ${b===c.brand?'selected':''}>${esc(b)}</option>`).join('')}<option value="__other" ${known?'':'selected'}>Drugo (upiši)…</option></select><input data-k="brand" placeholder="Upiši marku" value="${esc(c.brand)}" ${known?'hidden':''}>`})()}</div><input data-k="model" placeholder="Model" value="${esc(c.model)}"><button type="button" class="rm" data-act="rmRow" aria-label="Ukloni">×</button><input data-k="btu" inputmode="numeric" placeholder="BTU (npr. 12000)" value="${esc(c.btu)}"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena uređaja" value="${esc(c.price||'')}"></div>`;
 function vSettings(){
@@ -479,15 +486,15 @@ function vSettings(){
     <h2>Katalog uređaja</h2><p class="sub">Klime koje ugrađuješ, sa cenom uređaja. Biraš ih u poslu, uređaju i ponudi.</p>
     <datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>
     <div data-list="catalog">${s.catalog.map(rowCat).join('')||''}</div><button type="button" class="btn ghost small" data-act="addRow" data-list="catalog">+ Uređaj u katalog</button>
-    <h2>Ostale stavke za ponude</h2>
-    <label class="f"><span>Jedna stavka po redu: naziv = cena</span><textarea name="prices" rows="8">${esc(s.prices.map(p=>p[0]+' = '+p[1]).join('\n'))}</textarea></label>
+    <h2>Radovi i materijal</h2><p class="sub">Stavke koje dodaješ na posao ili u ponudu: metar instalacije, konzola, proboj zida, freon, kanalica…</p>
+    <div data-list="prices">${s.prices.map(rowType).join('')}</div><button type="button" class="btn ghost small" data-act="addRow" data-list="prices" style="margin-bottom:14px">+ Stavka</button>
     <label class="f"><span>Poruka za podsetnik o servisu ({ime}, {uredjaj}, {firma})</span><textarea name="sms" rows="4">${esc(s.sms)}</textarea></label>
     <button class="btn wide">Sačuvaj podešavanja</button></form>
     <h2>Rezervna kopija</h2>
     <div class="card"><p style="margin:0 0 10px;color:var(--muted);font-size:15px">Svi podaci i slike su samo na ovom telefonu. Kopiju sačuvaj u Fajlove, na Google Drive ili pošalji sebi mejlom.${S.lastBackup?' Poslednja kopija: '+esc(fmtDate(S.lastBackup))+'.':''}</p>
     <div class="btns"><button class="btn" data-act="exportData">Sačuvaj kopiju</button><label class="btn ghost">Vrati iz kopije<input type="file" accept=".json,application/json" hidden data-change="importData"></label></div></div>
     <h2>Opasna zona</h2><button class="btn danger wide" data-act="wipe">Obriši sve podatke</button>
-    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 8 · radi bez interneta</p>`;
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 10 · radi bez interneta</p>`;
 }
 
 /* ---------- FIRME I RADNICI ---------- */
@@ -584,18 +591,17 @@ function deviceForm(d={},cid,after){
   const isNew=!d.id;const st=S.settings;
   d={warrantyMonths:st.warranty,serviceMonths:st.serviceMonths,installDate:today(),...d};
   sheet(isNew?'Novi uređaj':'Izmeni uređaj',
-    `<datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>`+
-    (S.settings.catalog.length?`<label class="f"><span>Izaberi iz kataloga (popuni polja)</span><select data-fromcat><option value="">—</option>${S.settings.catalog.map((c,i)=>`<option value="${i}">${esc(catLabel(c))}</option>`).join('')}</select></label>`:'')+
-    `<div class="two">${combo('Marka','brand',brandList(),d.brand)}${combo('Snaga (BTU)','btu',BTUS,d.btu)}</div>`+
-    field('Model','model',d.model)+field('Prostorija (dnevna, spavaća...)','room',d.room)+
+    (()=>{const cat=S.settings.catalog;const lbl=devLabel({...d,room:''});const ci=cat.findIndex(c=>catLabel(c)===lbl);
+      const keep=!isNew&&ci<0&&lbl;
+      return `<label class="f"><span>Uređaj iz kataloga</span><select name="catIdx" required><option value="">— izaberi —</option>${keep?`<option value="__keep" selected>${esc(lbl)} (stari upis)</option>`:''}${cat.map((c,i)=>`<option value="${i}" ${i===ci?'selected':''}>${esc(catLabel(c))}</option>`).join('')}</select></label>`+
+      (cat.length?'':`<p class="sub">Katalog je prazan. Uređaje dodaj u <a href="#podesavanja" data-closesheet2>Podešavanja → Katalog uređaja</a>.</p>`)})()+
+    field('Prostorija (dnevna, spavaća...)','room',d.room)+
     `<div class="two">${field('Datum ugradnje','installDate',d.installDate,'date')}${field('Poslednji servis','lastService',d.lastService,'date')}</div>`+
     `<div class="two">${field('Garancija (meseci)','warrantyMonths',d.warrantyMonths,'number','inputmode="numeric"')}${field('Servis na (meseci)','serviceMonths',d.serviceMonths,'number','inputmode="numeric"')}</div>`+
     area('Napomena (freon, dužina instalacije...)','note',d.note)+
     `<button class="btn wide">Sačuvaj</button>`+(isNew?'':`<button type="button" class="btn danger wide" style="margin-top:10px" data-del>Obriši uređaj</button>`),
-    async v=>{v.btu=comboVal(v,'btu');v.brand=comboVal(v,'brand');const o={...d,...v,clientId:d.clientId||cid,id:d.id||uid()};await save('devices',o);toast('Uređaj sačuvan');if(after)after(o)},
-    {onOpen:(f,close)=>{const fc=f.querySelector('[data-fromcat]');if(fc)fc.onchange=()=>{const c=S.settings.catalog[+fc.value];if(!c)return;
-        setCombo(f,'brand',c.brand);f.querySelector('[name=model]').value=c.model||'';
-        const bs=f.querySelector('[name=btu]'),bo=f.querySelector('[name=btu_other]');if(!c.btu||BTUS.includes(String(c.btu))){bs.value=c.btu||'';bo.hidden=true}else{bs.value='__other';bo.value=c.btu;bo.hidden=false}};
+    async v=>{const ci=v.catIdx;delete v.catIdx;if(ci!=='__keep'){const c=S.settings.catalog[+ci];if(!c){toast('Izaberi uređaj iz kataloga');return false}v.brand=c.brand;v.model=c.model;v.btu=c.btu}const o={...d,...v,clientId:d.clientId||cid,id:d.id||uid()};await save('devices',o);toast('Uređaj sačuvan');if(after)after(o)},
+    {onOpen:(f,close)=>{const cl2=f.querySelector('[data-closesheet2]');if(cl2)cl2.onclick=()=>close();
       const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati uređaj?'))return;await remove('devices',d.id);close();render()}}});
 }
 
@@ -603,11 +609,10 @@ function jobForm(j={},opts={}){
   const isNew=!j.id;
   j={type:'Ugradnja',date:today(),status:'zakazano',...j};
   const clients=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'sr'));
-  const cat=knownModels();
+  const cat=S.settings.catalog;
   const devOpts=cid=>{const own=S.devices.filter(d=>d.clientId===cid);
     return `<option value="">— bez uređaja —</option>`+(own.length?`<optgroup label="Uređaji klijenta">${own.map(d=>`<option value="${d.id}" ${d.id===j.deviceId?'selected':''}>${esc(devLabel(d))}</option>`).join('')}</optgroup>`:'')+
-    (cat.length?`<optgroup label="Dodaj uređaj">${cat.map((c,i)=>`<option value="cat:${i}">${esc(catLabel(c))}${+c.price?' — '+money(c.price):''}</option>`).join('')}</optgroup>`:'')+
-    `<option value="__newdev">+ Novi uređaj (upiši)</option>`};
+    (cat.length?`<optgroup label="Iz kataloga (novi uređaj)">${cat.map((c,i)=>`<option value="cat:${i}">${esc(catLabel(c))}${+c.price?' — '+money(c.price):''}</option>`).join('')}</optgroup>`:'<option value="" disabled>Katalog je prazan — dodaj uređaje u Podešavanjima</option>')};
   sheet(isNew?'Novi posao':'Posao',
     firmSelect(j.firmId)+`<label class="f"><span>Klijent</span><select name="clientId">${clients.length?'':'<option value="__new">+ Novi klijent</option>'}${clients.map(c=>`<option value="${c.id}" ${c.id===j.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}${clients.length?'<option value="__new">+ Novi klijent</option>':''}</select></label>
     <fieldset data-newc ${clients.length?'hidden':''}>${field('Ime i prezime','nc_name')}${field('Telefon','nc_phone','','tel')}${field('Adresa','nc_address')}</fieldset>
@@ -615,9 +620,13 @@ function jobForm(j={},opts={}){
     ${field('Datum','date',j.date,'date','required')}${timeSel(j.time)}
     <label class="f"><span>Uređaj</span><select name="deviceId">${devOpts(j.clientId||(clients[0]||{}).id)}</select></label>
     <datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>
-    <fieldset data-newdev hidden><div class="two">${combo('Marka','nd_brand',brandList(),'')}${combo('Snaga (BTU)','nd_btu',BTUS,'')}</div>${field('Model','nd_model')}${field('Cena uređaja (din)','nd_price','','number','inputmode="numeric"')}<label class="chk"><input type="checkbox" name="nd_save" checked> Zapamti u katalogu</label></fieldset>
     <div data-room hidden>${field('Prostorija (dnevna, spavaća...)','nd_room')}</div>
-    <div class="two">${field('Cena (din)','price',j.price,'number','inputmode="numeric"')}<label class="f"><span>Status</span><select name="status"><option value="zakazano" ${j.status==='zakazano'?'selected':''}>Zakazano</option><option value="zavrseno" ${j.status==='zavrseno'?'selected':''}>Završeno</option><option value="otkazano" ${j.status==='otkazano'?'selected':''}>Otkazano</option></select></label></div>
+    <p class="sub" style="margin-top:-6px">Uređaje dodaješ i menjaš u <a href="#podesavanja" data-closesheet2>Podešavanja → Katalog uređaja</a>.</p>
+    <div class="f"><span>Radovi i materijal</span></div>
+    <div class="presets">${S.settings.prices.map((p,i)=>`<button type="button" data-jp="${i}">${esc(p[0])}</button>`).join('')}<button type="button" data-jp="__free">+ Ručna stavka</button></div>
+    <div data-jitems>${(j.items||[]).map(qItemRow).join('')}</div>
+    <div class="calc" data-calc></div>
+    <div class="two">${field('Cena za naplatu (din)','price',j.price,'number','inputmode="numeric"')}<label class="f"><span>Status</span><select name="status"><option value="zakazano" ${j.status==='zakazano'?'selected':''}>Zakazano</option><option value="zavrseno" ${j.status==='zavrseno'?'selected':''}>Završeno</option><option value="otkazano" ${j.status==='otkazano'?'selected':''}>Otkazano</option></select></label></div>
     <div class="f"><span>Radnici na poslu</span><div data-workers class="wbox"></div></div>
     <label class="chk"><input type="checkbox" name="paid" ${j.paid?'checked':''}> Naplaćeno</label>
     ${area('Napomena','note',j.note)}
@@ -626,19 +635,16 @@ function jobForm(j={},opts={}){
     async (v,f)=>{
       let cid=v.clientId;v.type=comboVal(v,'type')||'Posao';v.time=v.th?v.th+':'+v.tm:'';
       if(cid==='__new'){if(!v.nc_name){toast('Upiši ime klijenta');return false}const c={id:uid(),name:v.nc_name,phone:v.nc_phone,address:v.nc_address};await save('clients',c);cid=c.id}
-      let devId=v.deviceId;
-      if(devId&&(devId.startsWith('cat:')||devId==='__newdev')){
-        let base;
-        if(devId==='__newdev'){const btu=comboVal(v,'nd_btu');v.nd_brand=comboVal(v,'nd_brand')||'';if(!v.nd_brand.trim()&&!v.nd_model.trim()){toast('Upiši marku ili model uređaja');return false}
-          base={brand:v.nd_brand.trim(),model:v.nd_model.trim(),btu};
-          if(v.nd_save&&!S.settings.catalog.some(c=>catLabel(c)===catLabel(base))){S.settings.catalog.push({...base,price:+v.nd_price||0});await dbPut('meta',S.settings)}}
-        else{const c=cat[+devId.slice(4)];base={brand:c.brand,model:c.model,btu:c.btu}}
+      let devId=v.deviceId;let jobDevPrice=devId===j.deviceId?(+j.devPrice||0):0;
+      if(devId&&devId.startsWith('cat:'))jobDevPrice=+cat[+devId.slice(4)].price||0;
+      if(devId&&devId.startsWith('cat:')){
+        const c=cat[+devId.slice(4)];const base={brand:c.brand,model:c.model,btu:c.btu};
         const dv={...base,id:uid(),clientId:cid,room:v.nd_room,installDate:isInstall(v.type)?v.date:'',warrantyMonths:S.settings.warranty,serviceMonths:S.settings.serviceMonths};
         await save('devices',dv);devId=dv.id;
       }
       v.deviceId=devId;
       const wasDone=j.status==='zavrseno';
-      const o={...j,id:j.id||uid(),firmId:v.firmId||defFirm(),workerIds:[...f.querySelectorAll('[data-workers] input:checked')].map(x=>x.value),clientId:cid,type:v.type,date:v.date,time:v.time,deviceId:v.deviceId,price:v.price,status:v.status,paid:v.paid,note:v.note,quoteId:j.quoteId};
+      const o={...j,devPrice:jobDevPrice,items:readItems(f.querySelector('[data-jitems]')),id:j.id||uid(),firmId:v.firmId||defFirm(),workerIds:[...f.querySelectorAll('[data-workers] input:checked')].map(x=>x.value),clientId:cid,type:v.type,date:v.date,time:v.time,deviceId:v.deviceId,price:v.price,status:v.status,paid:v.paid,note:v.note,quoteId:j.quoteId};
       await save('jobs',o);
       if(o.quoteId){const q=S.quotes.find(x=>x.id===o.quoteId);if(q&&!q.jobId){q.jobId=o.id;await save('quotes',q)}}
       toast('Posao sačuvan');
@@ -646,13 +652,25 @@ function jobForm(j={},opts={}){
     },
     {onOpen:(f,close)=>{
       const sel=f.querySelector('[name=clientId]'),fs=f.querySelector('[data-newc]'),ds=f.querySelector('[name=deviceId]');
-      const nd=f.querySelector('[data-newdev]'),room=f.querySelector('[data-room]'),ty=f.querySelector('[name=type]'),pr=f.querySelector('[name=price]'),ndp=f.querySelector('[name=nd_price]');
-      const devPrice=()=>{const x=ds.value;if(x.startsWith('cat:'))return +cat[+x.slice(4)].price||0;if(x==='__newdev')return +ndp.value||0;return 0};
-      const autoPrice=()=>{const t=ty.value==='__other'?0:typePrice(ty.value);const sum=t+devPrice();pr.value=sum||''};
-      const devUI=()=>{nd.hidden=ds.value!=='__newdev';room.hidden=!(ds.value==='__newdev'||ds.value.startsWith('cat:'))};
+      const room=f.querySelector('[data-room]'),ty=f.querySelector('[name=type]'),pr=f.querySelector('[name=price]');
+      const cl2=f.querySelector('[data-closesheet2]');if(cl2)cl2.onclick=()=>close();
+      const devPrice=()=>{const x=ds.value;if(x&&x===j.deviceId)return +j.devPrice||0;if(x.startsWith('cat:'))return +cat[+x.slice(4)].price||0;return 0};
+      const jb=f.querySelector('[data-jitems]'),calc=f.querySelector('[data-calc]');
+      const parts=()=>{const t=ty.value==='__other'?0:typePrice(ty.value);return {t,d:devPrice(),m:itemsSum(jb)}};
+      const showCalc=()=>{const p=parts();const tn=ty.value==='__other'?(f.querySelector('[name=type_other]').value||'Posao'):ty.value;
+        const rows=[[tn,p.t],['Uređaj',p.d],['Radovi i materijal',p.m]].filter(r=>r[1]);
+        calc.innerHTML=rows.length?rows.map(r=>`<div><span>${esc(r[0])}</span><span class="num">${money(r[1])}</span></div>`).join('')+`<div class="tot"><span>Zbir</span><span class="num">${money(p.t+p.d+p.m)}</span></div>`:''};
+      const autoPrice=()=>{const p=parts();const sum=p.t+p.d+p.m;pr.value=sum||'';showCalc()};
+      jb.addEventListener('input',autoPrice);
+      jb.addEventListener('click',e=>{if(e.target.classList.contains('rm')){e.target.closest('.qi').remove();autoPrice()}});
+      f.querySelectorAll('[data-jp]').forEach(b=>b.onclick=()=>{
+        if(b.dataset.jp==='__free'){jb.insertAdjacentHTML('beforeend',qItemRow());jb.lastElementChild.querySelector('input').focus();return}
+        const it=S.settings.prices[+b.dataset.jp];const ex=[...jb.querySelectorAll('.qi')].find(r=>r.querySelector('[data-k=name]').value===it[0]);
+        if(ex){const q=ex.querySelector('[data-k=qty]');q.value=(+q.value||0)+1}else jb.insertAdjacentHTML('beforeend',qItemRow({name:it[0],qty:1,price:it[1]}));autoPrice()});
+      const devUI=()=>{room.hidden=!ds.value.startsWith('cat:')};
       sel.onchange=()=>{fs.hidden=sel.value!=='__new';ds.innerHTML=devOpts(sel.value);devUI();autoPrice()};
-      ds.addEventListener('change',()=>{devUI();autoPrice();if(ds.value==='__newdev')f.querySelector('[name=nd_brand]').focus()});
-      ty.addEventListener('change',autoPrice);ndp.addEventListener('input',autoPrice);
+      ds.addEventListener('change',()=>{devUI();autoPrice()});
+      ty.addEventListener('change',autoPrice);showCalc();
       if(isNew&&!j.price)autoPrice();
       const wb=f.querySelector('[data-workers]'),fsel=f.querySelector('[name=firmId]');
       const drawW=()=>{const fid=fsel?fsel.value:defFirm();const cur=(j.workerIds||[]);
@@ -679,7 +697,7 @@ function quoteForm(q={}){
   q={date:today(),items:[],...q};
   const clients=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'sr'));
   const P=[...S.settings.catalog.map(c=>[catLabel(c),+c.price||0]),...S.settings.jobTypes.filter(t=>+t[1]>0),...S.settings.prices].filter((x,i,arr)=>arr.findIndex(y=>y[0].toLowerCase()===x[0].toLowerCase())===i);
-  const itemRow=(i={name:'',qty:1,price:''})=>`<div class="qi"><input data-k="name" placeholder="Stavka" value="${esc(i.name)}"><input data-k="qty" type="number" inputmode="decimal" value="${esc(i.qty)}" aria-label="Količina"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena" value="${esc(i.price)}" aria-label="Cena"><button type="button" class="rm" aria-label="Ukloni">×</button></div>`;
+  const itemRow=qItemRow;
   sheet(isNew?'Nova ponuda':'Izmeni ponudu',
     firmSelect(q.firmId)+`<label class="f"><span>Klijent</span><select name="clientId"><option value="">— samo ime —</option>${clients.map(c=>`<option value="${c.id}" ${c.id===q.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
     <div data-cname ${q.clientId?'hidden':''}>${field('Ime (ako nije u klijentima)','clientName',q.clientName)}</div>
@@ -736,7 +754,7 @@ function serviceMenu(d){
 const A={
   back:()=>history.length>1?history.back():go('danas'),
   go:el=>go(el.dataset.h),
-  addRow:el=>{const box=document.querySelector(`[data-list="${el.dataset.list}"]`);box.insertAdjacentHTML('beforeend',el.dataset.list==='types'?rowType():rowCat());box.lastElementChild.querySelector('input').focus()},
+  addRow:el=>{const box=document.querySelector(`[data-list="${el.dataset.list}"]`);box.insertAdjacentHTML('beforeend',el.dataset.list==='catalog'?rowCat():rowType());box.lastElementChild.querySelector('input').focus()},
   rmRow:el=>el.closest('.lr').remove(),
   pickFirm:el=>{setCurFirm(el.dataset.id);jobWorker='';render()},
   newFirm:()=>firmForm(),
@@ -765,7 +783,7 @@ const A={
   quoteToJob:el=>{const q=S.quotes.find(x=>x.id===el.dataset.id);
     if(q.jobId&&S.jobs.find(j=>j.id===q.jobId)){jobForm(S.jobs.find(j=>j.id===q.jobId));return}
     if(!q.clientId){toast('Prvo izaberi klijenta u ponudi (Izmeni)');return}
-    jobForm({clientId:q.clientId,price:qTotal(q),quoteId:q.id,note:q.items.map(i=>i.name+(i.qty!==1?' ×'+i.qty:'')).join(', ')})},
+    jobForm({clientId:q.clientId,firmId:q.firmId,price:qTotal(q),quoteId:q.id,items:q.items.map(i=>({...i})),note:q.note||''})},
   viewPhoto:el=>{const p=PHOTO_CACHE.find(x=>x.id===el.dataset.id);if(!p)return;
     const v=document.createElement('div');v.className='viewer';v.innerHTML=`<div class="vb"><button class="btn danger small" style="color:#ff8a80;border-color:#444">Obriši</button><button class="btn small ghost">Zatvori</button></div><img src="${p.data}" alt="Slika">`;
     document.body.appendChild(v);const[del,cl]=v.querySelectorAll('button');cl.onclick=()=>v.remove();
@@ -794,7 +812,7 @@ document.addEventListener('change',async e=>{const t=e.target;
     for(const s of STORES){await dbClear(s);for(const o of data[s]||[])await dbPut(s,o)}await load();toast('Podaci vraćeni');go('danas')}catch(err){toast('Ovo nije ispravan fajl kopije')}}
 });
 document.addEventListener('submit',async e=>{const f=e.target;if(f.dataset.submit!=='saveSettings')return;e.preventDefault();const d=Object.fromEntries(new FormData(f));
-  const prices=d.prices.split('\n').map(l=>l.split('=')).filter(p=>p[0].trim()).map(p=>[p[0].trim(),+(p[1]||'').replace(/[^\d]/g,'')||0]);
+  const prices=[...f.querySelectorAll('[data-list=prices] .lr')].map(r=>[r.querySelector('[data-k=name]').value.trim(),+r.querySelector('[data-k=price]').value||0]).filter(t=>t[0]);
   const jobTypes=[...f.querySelectorAll('[data-list=types] .lr')].map(r=>[r.querySelector('[data-k=name]').value.trim(),+r.querySelector('[data-k=price]').value||0]).filter(t=>t[0]);
   const catalog=[...f.querySelectorAll('[data-list=catalog] .lr')].map(r=>({brand:r.querySelector('[data-k=brand]').value.trim(),model:r.querySelector('[data-k=model]').value.trim(),btu:r.querySelector('[data-k=btu]').value.replace(/[^\d]/g,''),price:+r.querySelector('[data-k=price]').value||0})).filter(c=>c.brand||c.model);
   if(!jobTypes.length){toast('Ostavi bar jednu vrstu posla');return}
