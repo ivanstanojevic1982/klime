@@ -239,6 +239,9 @@ const isInstall=t=>/ugrad/i.test(t||''),isService=t=>/servis/i.test(t||'');
 const brandList=()=>[...new Set([...BRANDS,...S.settings.catalog.map(c=>c.brand),...S.devices.map(d=>d.brand)].filter(Boolean))];
 function setCombo(f,name,val){const sel=f.querySelector(`[name="${name}"]`),o=f.querySelector(`[name="${name}_other"]`);const has=[...sel.options].some(x=>x.value===String(val||''));
   if(!val||has){sel.value=val||'';o.hidden=true;o.value=''}else{sel.value='__other';o.value=val;o.hidden=false}}
+function knownModels(){const out=S.settings.catalog.map(c=>({...c}));
+  S.devices.forEach(d=>{const m={brand:d.brand||'',model:d.model||'',btu:d.btu||'',price:0};if((m.brand||m.model)&&!out.some(x=>catLabel(x)===catLabel(m)))out.push(m)});
+  return out.sort((a,b)=>catLabel(a).localeCompare(catLabel(b),'sr'))}
 const catLabel=c=>[c.brand,c.model,c.btu?c.btu+' BTU':''].filter(Boolean).join(' ');
 const BRANDS=['Gree','Midea','Daikin','Mitsubishi Electric','Mitsubishi Heavy','LG','Samsung','Vivax','Tesla','Fujitsu','Toshiba','Panasonic','Hisense','Haier','Bosch','Sinclair','Hyundai','Electrolux','Cooper&Hunter','Fujiko'];
 const BTUS=['7000','9000','12000','18000','24000','36000','48000'];
@@ -449,7 +452,7 @@ function vSettings(){
     <div class="card"><p style="margin:0 0 10px;color:var(--muted);font-size:15px">Svi podaci i slike su samo na ovom telefonu. Kopiju sačuvaj u Fajlove, na Google Drive ili pošalji sebi mejlom.${S.lastBackup?' Poslednja kopija: '+esc(fmtDate(S.lastBackup))+'.':''}</p>
     <div class="btns"><button class="btn" data-act="exportData">Sačuvaj kopiju</button><label class="btn ghost">Vrati iz kopije<input type="file" accept=".json,application/json" hidden data-change="importData"></label></div></div>
     <h2>Opasna zona</h2><button class="btn danger wide" data-act="wipe">Obriši sve podatke</button>
-    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 6 · radi bez interneta</p>`;
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 7 · radi bez interneta</p>`;
 }
 
 /* ---------- forme (sheet) ---------- */
@@ -521,10 +524,10 @@ function jobForm(j={},opts={}){
   const isNew=!j.id;
   j={type:'Ugradnja',date:today(),status:'zakazano',...j};
   const clients=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'sr'));
-  const cat=S.settings.catalog;
+  const cat=knownModels();
   const devOpts=cid=>{const own=S.devices.filter(d=>d.clientId===cid);
     return `<option value="">— bez uređaja —</option>`+(own.length?`<optgroup label="Uređaji klijenta">${own.map(d=>`<option value="${d.id}" ${d.id===j.deviceId?'selected':''}>${esc(devLabel(d))}</option>`).join('')}</optgroup>`:'')+
-    (cat.length?`<optgroup label="Novi uređaj iz kataloga">${cat.map((c,i)=>`<option value="cat:${i}">${esc(catLabel(c))}${+c.price?' — '+money(c.price):''}</option>`).join('')}</optgroup>`:'')+
+    (cat.length?`<optgroup label="Dodaj uređaj">${cat.map((c,i)=>`<option value="cat:${i}">${esc(catLabel(c))}${+c.price?' — '+money(c.price):''}</option>`).join('')}</optgroup>`:'')+
     `<option value="__newdev">+ Novi uređaj (upiši)</option>`};
   sheet(isNew?'Novi posao':'Posao',
     `<label class="f"><span>Klijent</span><select name="clientId">${clients.length?'':'<option value="__new">+ Novi klijent</option>'}${clients.map(c=>`<option value="${c.id}" ${c.id===j.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}${clients.length?'<option value="__new">+ Novi klijent</option>':''}</select></label>
@@ -549,7 +552,7 @@ function jobForm(j={},opts={}){
         if(devId==='__newdev'){const btu=comboVal(v,'nd_btu');v.nd_brand=comboVal(v,'nd_brand')||'';if(!v.nd_brand.trim()&&!v.nd_model.trim()){toast('Upiši marku ili model uređaja');return false}
           base={brand:v.nd_brand.trim(),model:v.nd_model.trim(),btu};
           if(v.nd_save&&!S.settings.catalog.some(c=>catLabel(c)===catLabel(base))){S.settings.catalog.push({...base,price:+v.nd_price||0});await dbPut('meta',S.settings)}}
-        else{const c=S.settings.catalog[+devId.slice(4)];base={brand:c.brand,model:c.model,btu:c.btu}}
+        else{const c=cat[+devId.slice(4)];base={brand:c.brand,model:c.model,btu:c.btu}}
         const dv={...base,id:uid(),clientId:cid,room:v.nd_room,installDate:isInstall(v.type)?v.date:'',warrantyMonths:S.settings.warranty,serviceMonths:S.settings.serviceMonths};
         await save('devices',dv);devId=dv.id;
       }
@@ -564,7 +567,7 @@ function jobForm(j={},opts={}){
     {onOpen:(f,close)=>{
       const sel=f.querySelector('[name=clientId]'),fs=f.querySelector('[data-newc]'),ds=f.querySelector('[name=deviceId]');
       const nd=f.querySelector('[data-newdev]'),room=f.querySelector('[data-room]'),ty=f.querySelector('[name=type]'),pr=f.querySelector('[name=price]'),ndp=f.querySelector('[name=nd_price]');
-      const devPrice=()=>{const x=ds.value;if(x.startsWith('cat:'))return +S.settings.catalog[+x.slice(4)].price||0;if(x==='__newdev')return +ndp.value||0;return 0};
+      const devPrice=()=>{const x=ds.value;if(x.startsWith('cat:'))return +cat[+x.slice(4)].price||0;if(x==='__newdev')return +ndp.value||0;return 0};
       const autoPrice=()=>{const t=ty.value==='__other'?0:typePrice(ty.value);const sum=t+devPrice();pr.value=sum||''};
       const devUI=()=>{nd.hidden=ds.value!=='__newdev';room.hidden=!(ds.value==='__newdev'||ds.value.startsWith('cat:'))};
       sel.onchange=()=>{fs.hidden=sel.value!=='__new';ds.innerHTML=devOpts(sel.value);devUI();autoPrice()};
