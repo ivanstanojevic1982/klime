@@ -125,6 +125,8 @@ nav.tabs a.on{color:var(--blue)}
 .f{display:block;margin-bottom:12px}
 .f>span{display:block;font-size:14px;font-weight:600;color:var(--muted);margin:0 2px 4px}
 .f input,.f select,.f textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface);font-size:16px;min-height:46px}
+.f div>select{flex:1}
+.f input[hidden]{display:none}
 .f textarea{min-height:80px;resize:vertical}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .chk{display:flex;align-items:center;gap:10px;margin:4px 2px 14px;font-weight:600}
@@ -443,6 +445,20 @@ function sheet(title,html,onSubmit,{onOpen}={}){
 }
 const field=(label,name,val='',type='text',extra='')=>`<label class="f"><span>${label}</span><input name="${name}" type="${type}" value="${esc(val)}" ${extra}></label>`;
 const area=(label,name,val='')=>`<label class="f"><span>${label}</span><textarea name="${name}">${esc(val)}</textarea></label>`;
+/* izbor + "Drugo (upiši)" */
+function combo(label,name,opts,val,{suffix='',empty=true}={}){
+  const known=!val||opts.includes(String(val));
+  return `<label class="f"><span>${label}</span><select name="${name}" data-combo="${name}">${empty?'<option value="">—</option>':''}${opts.map(o=>`<option value="${esc(o)}" ${String(val)===o?'selected':''}>${esc(o)}${suffix}</option>`).join('')}<option value="__other" ${known?'':'selected'}>Drugo (upiši)…</option></select>
+  <input name="${name}_other" placeholder="Upiši" value="${known?'':esc(val)}" style="margin-top:6px" ${known?'hidden':''}></label>`;
+}
+function comboVal(v,name){const r=v[name]==='__other'?(v[name+'_other']||'').trim():v[name];delete v[name+'_other'];return r}
+/* vreme: sat + minut kao obični izbori (radi i na iPhoneu bez dugmeta "Sačuvaj") */
+function timeSel(val){
+  const [h,m]=(val||'').split(':');const mins=['00','15','30','45'];if(m&&!mins.includes(m))mins.push(m);
+  let hs='<option value="">—</option>';for(let i=6;i<=22;i++){const x=pad(i);hs+=`<option ${x===h?'selected':''}>${x}</option>`}
+  return `<label class="f"><span>Vreme</span><div style="display:flex;gap:6px;align-items:center"><select name="th" aria-label="Sat">${hs}</select><b>:</b><select name="tm" aria-label="Minut">${mins.map(x=>`<option ${x===(m||'00')?'selected':''}>${x}</option>`).join('')}</select></div></label>`;
+}
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset&&t.dataset.combo){const o=t.form.querySelector(`[name="${t.dataset.combo}_other"]`);o.hidden=t.value!=='__other';if(!o.hidden)o.focus()}});
 
 function clientForm(c={},after){
   const isNew=!c.id;
@@ -463,13 +479,13 @@ function deviceForm(d={},cid,after){
   d={warrantyMonths:st.warranty,serviceMonths:st.serviceMonths,installDate:today(),...d};
   sheet(isNew?'Novi uređaj':'Izmeni uređaj',
     `<datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>`+
-    `<div class="two">${field('Marka','brand',d.brand,'text','list="brands" autocomplete="off"')}<label class="f"><span>Snaga</span><select name="btu"><option value="">—</option>${BTUS.map(b=>`<option ${String(d.btu)===b?'selected':''} value="${b}">${b} BTU</option>`).join('')}</select></label></div>`+
+    `<div class="two">${field('Marka','brand',d.brand,'text','list="brands" autocomplete="off"')}${combo('Snaga (BTU)','btu',BTUS,d.btu)}</div>`+
     field('Model','model',d.model)+field('Prostorija (dnevna, spavaća...)','room',d.room)+
     `<div class="two">${field('Datum ugradnje','installDate',d.installDate,'date')}${field('Poslednji servis','lastService',d.lastService,'date')}</div>`+
     `<div class="two">${field('Garancija (meseci)','warrantyMonths',d.warrantyMonths,'number','inputmode="numeric"')}${field('Servis na (meseci)','serviceMonths',d.serviceMonths,'number','inputmode="numeric"')}</div>`+
     area('Napomena (freon, dužina instalacije...)','note',d.note)+
     `<button class="btn wide">Sačuvaj</button>`+(isNew?'':`<button type="button" class="btn danger wide" style="margin-top:10px" data-del>Obriši uređaj</button>`),
-    async v=>{const o={...d,...v,clientId:d.clientId||cid,id:d.id||uid()};await save('devices',o);toast('Uređaj sačuvan');if(after)after(o)},
+    async v=>{v.btu=comboVal(v,'btu');const o={...d,...v,clientId:d.clientId||cid,id:d.id||uid()};await save('devices',o);toast('Uređaj sačuvan');if(after)after(o)},
     {onOpen:(f,close)=>{const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati uređaj?'))return;await remove('devices',d.id);close();render()}}});
 }
 
@@ -481,8 +497,8 @@ function jobForm(j={},opts={}){
   sheet(isNew?'Novi posao':'Posao',
     `<label class="f"><span>Klijent</span><select name="clientId">${clients.length?'':'<option value="__new">+ Novi klijent</option>'}${clients.map(c=>`<option value="${c.id}" ${c.id===j.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}${clients.length?'<option value="__new">+ Novi klijent</option>':''}</select></label>
     <fieldset data-newc ${clients.length?'hidden':''}>${field('Ime i prezime','nc_name')}${field('Telefon','nc_phone','','tel')}${field('Adresa','nc_address')}</fieldset>
-    <label class="f"><span>Vrsta posla</span><select name="type">${JOB_TYPES.map(t=>`<option ${t===j.type?'selected':''}>${t}</option>`).join('')}</select></label>
-    <div class="two">${field('Datum','date',j.date,'date','required')}${field('Vreme','time',j.time,'time')}</div>
+    ${combo('Vrsta posla','type',JOB_TYPES,j.type,{empty:false})}
+    ${field('Datum','date',j.date,'date','required')}${timeSel(j.time)}
     <label class="f" data-devwrap><span>Uređaj</span><select name="deviceId">${devOpts(j.clientId||(clients[0]||{}).id)}</select></label>
     <div class="two">${field('Cena (din)','price',j.price,'number','inputmode="numeric"')}<label class="f"><span>Status</span><select name="status"><option value="zakazano" ${j.status==='zakazano'?'selected':''}>Zakazano</option><option value="zavrseno" ${j.status==='zavrseno'?'selected':''}>Završeno</option><option value="otkazano" ${j.status==='otkazano'?'selected':''}>Otkazano</option></select></label></div>
     <label class="chk"><input type="checkbox" name="paid" ${j.paid?'checked':''}> Naplaćeno</label>
@@ -490,7 +506,7 @@ function jobForm(j={},opts={}){
     <button class="btn wide">Sačuvaj</button>
     ${isNew?'':`<div class="btns" style="margin-top:10px"><button type="button" class="btn ghost" style="flex:1" data-open>Otvori klijenta</button><button type="button" class="btn danger" style="flex:1" data-del>Obriši</button></div>`}`,
     async v=>{
-      let cid=v.clientId;
+      let cid=v.clientId;v.type=comboVal(v,'type')||'Posao';v.time=v.th?v.th+':'+v.tm:'';
       if(cid==='__new'){if(!v.nc_name){toast('Upiši ime klijenta');return false}const c={id:uid(),name:v.nc_name,phone:v.nc_phone,address:v.nc_address};await save('clients',c);cid=c.id}
       const wasDone=j.status==='zavrseno';
       const o={...j,id:j.id||uid(),clientId:cid,type:v.type,date:v.date,time:v.time,deviceId:v.deviceId,price:v.price,status:v.status,paid:v.paid,note:v.note,quoteId:j.quoteId};
