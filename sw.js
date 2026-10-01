@@ -1,5 +1,5 @@
 // Kad menjaš aplikaciju, povećaj broj verzije da bi telefon preuzeo novu.
-const CACHE = 'klima-v2';
+const CACHE = 'klima-v3';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

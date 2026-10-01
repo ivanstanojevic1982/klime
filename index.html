@@ -139,6 +139,11 @@ fieldset[hidden]{display:none}
 .qi input{padding:9px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:16px;min-width:0;width:100%}
 .qi .rm{border:0;background:none;color:var(--red);font-size:20px;cursor:pointer}
 .qtotal{display:flex;justify-content:space-between;font-size:20px;font-weight:750;padding:12px 2px;border-top:2px solid var(--ink);margin-top:8px}
+.lr{display:grid;grid-template-columns:1fr 110px 30px;gap:6px;margin-bottom:8px;align-items:center}
+.lr.cat{grid-template-columns:1fr 1fr 30px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
+.lr input{padding:9px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:16px;min-width:0;width:100%}
+.lr .rm,.qi .rm{border:0;background:none;color:var(--red);font-size:22px;cursor:pointer}
+.sub{color:var(--muted);font-size:14px;margin:-4px 4px 10px}
 .presets{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
 .presets button{border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:6px 11px;font-size:13px;cursor:pointer}
 
@@ -189,7 +194,8 @@ const dbClear=s=>tx(s,'readwrite',st=>st.clear());
 const photosOf=cid=>tx('photos','readonly',st=>st.index('clientId').getAll(cid));
 
 const DEFAULT_SETTINGS={id:'settings',firm:'',phone:'',warranty:24,serviceMonths:12,
-  prices:[['Montaža klime (do 3 m instalacije)',10000],['Dodatni metar instalacije',1500],['Konzola za spoljnu jedinicu',2500],['Proboj zida',1500],['Servis i čišćenje',4000],['Dopuna freona',5000],['Demontaža',5000]],
+  jobTypes:[['Ugradnja',10000],['Servis',4000],['Popravka',0],['Demontaža',5000],['Pregled / ponuda',0]],catalog:[],
+  prices:[['Dodatni metar instalacije',1500],['Konzola za spoljnu jedinicu',2500],['Proboj zida',1500],['Dopuna freona',5000]],
   sms:'Poštovani {ime}, prošlo je godinu dana od poslednjeg servisa vaše klime ({uredjaj}). Da zakažemo čišćenje i proveru? Pozdrav, {firma}'};
 const S={clients:[],devices:[],jobs:[],quotes:[],settings:{...DEFAULT_SETTINGS},lastBackup:null};
 
@@ -224,7 +230,10 @@ const mapLink=a=>'https://www.google.com/maps/search/?api=1&query='+encodeURICom
 const client=id=>S.clients.find(c=>c.id===id);
 const device=id=>S.devices.find(d=>d.id===id);
 const devLabel=d=>d?[d.brand,d.model,d.btu?d.btu+' BTU':''].filter(Boolean).join(' ')+(d.room?' — '+d.room:''):'';
-const JOB_TYPES=['Ugradnja','Servis','Popravka','Demontaža','Pregled / ponuda'];
+const jobTypeNames=()=>S.settings.jobTypes.map(t=>t[0]);
+const typePrice=name=>{const t=S.settings.jobTypes.find(t=>t[0]===name);return t?+t[1]||0:0};
+const isInstall=t=>/ugrad/i.test(t||''),isService=t=>/servis/i.test(t||'');
+const catLabel=c=>[c.brand,c.model,c.btu?c.btu+' BTU':''].filter(Boolean).join(' ');
 const BRANDS=['Gree','Midea','Daikin','Mitsubishi Electric','Mitsubishi Heavy','LG','Samsung','Vivax','Tesla','Fujitsu','Toshiba','Panasonic','Hisense','Haier','Bosch','Sinclair','Hyundai','Electrolux','Cooper&Hunter','Fujiko'];
 const BTUS=['7000','9000','12000','18000','24000','36000','48000'];
 function nextService(d){const base=d.lastService||d.installDate;return base?addMonths(base,d.serviceMonths||S.settings.serviceMonths||12):null}
@@ -411,6 +420,8 @@ function vQuote(id){
 }
 
 /* ---------- PODEŠAVANJA ---------- */
+const rowType=(t=['',''])=>`<div class="lr"><input data-k="name" placeholder="Naziv posla" value="${esc(t[0])}"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena" value="${esc(t[1]||'')}"><button type="button" class="rm" data-act="rmRow" aria-label="Ukloni">×</button></div>`;
+const rowCat=(c={})=>`<div class="lr cat"><input data-k="brand" list="brands" placeholder="Marka" value="${esc(c.brand)}"><input data-k="model" placeholder="Model" value="${esc(c.model)}"><button type="button" class="rm" data-act="rmRow" aria-label="Ukloni">×</button><input data-k="btu" inputmode="numeric" placeholder="BTU (npr. 12000)" value="${esc(c.btu)}"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena uređaja" value="${esc(c.price||'')}"></div>`;
 function vSettings(){
   header('Podešavanja',{back:true});
   const s=S.settings;
@@ -419,7 +430,13 @@ function vSettings(){
     <div class="f"><span>Tvoj telefon (ide u ponude)</span><input name="phone" type="tel" value="${esc(s.phone)}"></div>
     <div class="two"><label class="f"><span>Garancija (meseci)</span><input name="warranty" type="number" inputmode="numeric" value="${esc(s.warranty)}"></label>
     <label class="f"><span>Servis na (meseci)</span><input name="serviceMonths" type="number" inputmode="numeric" value="${esc(s.serviceMonths)}"></label></div>
-    <label class="f"><span>Cenovnik — jedna stavka po redu: naziv = cena</span><textarea name="prices" rows="8">${esc(s.prices.map(p=>p[0]+' = '+p[1]).join('\n'))}</textarea></label>
+    <h2>Vrste posla i cene</h2><p class="sub">Cena se sama upiše kad izabereš vrstu posla. Uvek može da se promeni.</p>
+    <div data-list="types">${s.jobTypes.map(rowType).join('')}</div><button type="button" class="btn ghost small" data-act="addRow" data-list="types">+ Vrsta posla</button>
+    <h2>Katalog uređaja</h2><p class="sub">Klime koje ugrađuješ, sa cenom uređaja. Biraš ih u poslu, uređaju i ponudi.</p>
+    <datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>
+    <div data-list="catalog">${s.catalog.map(rowCat).join('')||''}</div><button type="button" class="btn ghost small" data-act="addRow" data-list="catalog">+ Uređaj u katalog</button>
+    <h2>Ostale stavke za ponude</h2>
+    <label class="f"><span>Jedna stavka po redu: naziv = cena</span><textarea name="prices" rows="8">${esc(s.prices.map(p=>p[0]+' = '+p[1]).join('\n'))}</textarea></label>
     <label class="f"><span>Poruka za podsetnik o servisu ({ime}, {uredjaj}, {firma})</span><textarea name="sms" rows="4">${esc(s.sms)}</textarea></label>
     <button class="btn wide">Sačuvaj podešavanja</button></form>
     <h2>Rezervna kopija</h2>
@@ -479,6 +496,7 @@ function deviceForm(d={},cid,after){
   d={warrantyMonths:st.warranty,serviceMonths:st.serviceMonths,installDate:today(),...d};
   sheet(isNew?'Novi uređaj':'Izmeni uređaj',
     `<datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>`+
+    (S.settings.catalog.length?`<label class="f"><span>Izaberi iz kataloga (popuni polja)</span><select data-fromcat><option value="">—</option>${S.settings.catalog.map((c,i)=>`<option value="${i}">${esc(catLabel(c))}</option>`).join('')}</select></label>`:'')+
     `<div class="two">${field('Marka','brand',d.brand,'text','list="brands" autocomplete="off"')}${combo('Snaga (BTU)','btu',BTUS,d.btu)}</div>`+
     field('Model','model',d.model)+field('Prostorija (dnevna, spavaća...)','room',d.room)+
     `<div class="two">${field('Datum ugradnje','installDate',d.installDate,'date')}${field('Poslednji servis','lastService',d.lastService,'date')}</div>`+
@@ -486,20 +504,30 @@ function deviceForm(d={},cid,after){
     area('Napomena (freon, dužina instalacije...)','note',d.note)+
     `<button class="btn wide">Sačuvaj</button>`+(isNew?'':`<button type="button" class="btn danger wide" style="margin-top:10px" data-del>Obriši uređaj</button>`),
     async v=>{v.btu=comboVal(v,'btu');const o={...d,...v,clientId:d.clientId||cid,id:d.id||uid()};await save('devices',o);toast('Uređaj sačuvan');if(after)after(o)},
-    {onOpen:(f,close)=>{const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati uređaj?'))return;await remove('devices',d.id);close();render()}}});
+    {onOpen:(f,close)=>{const fc=f.querySelector('[data-fromcat]');if(fc)fc.onchange=()=>{const c=S.settings.catalog[+fc.value];if(!c)return;
+        f.querySelector('[name=brand]').value=c.brand||'';f.querySelector('[name=model]').value=c.model||'';
+        const bs=f.querySelector('[name=btu]'),bo=f.querySelector('[name=btu_other]');if(!c.btu||BTUS.includes(String(c.btu))){bs.value=c.btu||'';bo.hidden=true}else{bs.value='__other';bo.value=c.btu;bo.hidden=false}};
+      const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati uređaj?'))return;await remove('devices',d.id);close();render()}}});
 }
 
 function jobForm(j={},opts={}){
   const isNew=!j.id;
   j={type:'Ugradnja',date:today(),status:'zakazano',...j};
   const clients=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'sr'));
-  const devOpts=cid=>`<option value="">—</option>`+S.devices.filter(d=>d.clientId===cid).map(d=>`<option value="${d.id}" ${d.id===j.deviceId?'selected':''}>${esc(devLabel(d))}</option>`).join('');
+  const cat=S.settings.catalog;
+  const devOpts=cid=>{const own=S.devices.filter(d=>d.clientId===cid);
+    return `<option value="">— bez uređaja —</option>`+(own.length?`<optgroup label="Uređaji klijenta">${own.map(d=>`<option value="${d.id}" ${d.id===j.deviceId?'selected':''}>${esc(devLabel(d))}</option>`).join('')}</optgroup>`:'')+
+    (cat.length?`<optgroup label="Novi uređaj iz kataloga">${cat.map((c,i)=>`<option value="cat:${i}">${esc(catLabel(c))}${+c.price?' — '+money(c.price):''}</option>`).join('')}</optgroup>`:'')+
+    `<option value="__newdev">+ Novi uređaj (upiši)</option>`};
   sheet(isNew?'Novi posao':'Posao',
     `<label class="f"><span>Klijent</span><select name="clientId">${clients.length?'':'<option value="__new">+ Novi klijent</option>'}${clients.map(c=>`<option value="${c.id}" ${c.id===j.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}${clients.length?'<option value="__new">+ Novi klijent</option>':''}</select></label>
     <fieldset data-newc ${clients.length?'hidden':''}>${field('Ime i prezime','nc_name')}${field('Telefon','nc_phone','','tel')}${field('Adresa','nc_address')}</fieldset>
-    ${combo('Vrsta posla','type',JOB_TYPES,j.type,{empty:false})}
+    ${combo('Vrsta posla','type',jobTypeNames(),j.type,{empty:false})}
     ${field('Datum','date',j.date,'date','required')}${timeSel(j.time)}
-    <label class="f" data-devwrap><span>Uređaj</span><select name="deviceId">${devOpts(j.clientId||(clients[0]||{}).id)}</select></label>
+    <label class="f"><span>Uređaj</span><select name="deviceId">${devOpts(j.clientId||(clients[0]||{}).id)}</select></label>
+    <datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>
+    <fieldset data-newdev hidden><div class="two">${field('Marka','nd_brand','','text','list="brands" autocomplete="off"')}${combo('Snaga (BTU)','nd_btu',BTUS,'')}</div>${field('Model','nd_model')}${field('Cena uređaja (din)','nd_price','','number','inputmode="numeric"')}<label class="chk"><input type="checkbox" name="nd_save" checked> Zapamti u katalogu</label></fieldset>
+    <div data-room hidden>${field('Prostorija (dnevna, spavaća...)','nd_room')}</div>
     <div class="two">${field('Cena (din)','price',j.price,'number','inputmode="numeric"')}<label class="f"><span>Status</span><select name="status"><option value="zakazano" ${j.status==='zakazano'?'selected':''}>Zakazano</option><option value="zavrseno" ${j.status==='zavrseno'?'selected':''}>Završeno</option><option value="otkazano" ${j.status==='otkazano'?'selected':''}>Otkazano</option></select></label></div>
     <label class="chk"><input type="checkbox" name="paid" ${j.paid?'checked':''}> Naplaćeno</label>
     ${area('Napomena','note',j.note)}
@@ -508,6 +536,17 @@ function jobForm(j={},opts={}){
     async v=>{
       let cid=v.clientId;v.type=comboVal(v,'type')||'Posao';v.time=v.th?v.th+':'+v.tm:'';
       if(cid==='__new'){if(!v.nc_name){toast('Upiši ime klijenta');return false}const c={id:uid(),name:v.nc_name,phone:v.nc_phone,address:v.nc_address};await save('clients',c);cid=c.id}
+      let devId=v.deviceId;
+      if(devId&&(devId.startsWith('cat:')||devId==='__newdev')){
+        let base;
+        if(devId==='__newdev'){const btu=comboVal(v,'nd_btu');if(!v.nd_brand.trim()&&!v.nd_model.trim()){toast('Upiši marku ili model uređaja');return false}
+          base={brand:v.nd_brand.trim(),model:v.nd_model.trim(),btu};
+          if(v.nd_save&&!S.settings.catalog.some(c=>catLabel(c)===catLabel(base))){S.settings.catalog.push({...base,price:+v.nd_price||0});await dbPut('meta',S.settings)}}
+        else{const c=S.settings.catalog[+devId.slice(4)];base={brand:c.brand,model:c.model,btu:c.btu}}
+        const dv={...base,id:uid(),clientId:cid,room:v.nd_room,installDate:isInstall(v.type)?v.date:'',warrantyMonths:S.settings.warranty,serviceMonths:S.settings.serviceMonths};
+        await save('devices',dv);devId=dv.id;
+      }
+      v.deviceId=devId;
       const wasDone=j.status==='zavrseno';
       const o={...j,id:j.id||uid(),clientId:cid,type:v.type,date:v.date,time:v.time,deviceId:v.deviceId,price:v.price,status:v.status,paid:v.paid,note:v.note,quoteId:j.quoteId};
       await save('jobs',o);
@@ -517,7 +556,14 @@ function jobForm(j={},opts={}){
     },
     {onOpen:(f,close)=>{
       const sel=f.querySelector('[name=clientId]'),fs=f.querySelector('[data-newc]'),ds=f.querySelector('[name=deviceId]');
-      sel.onchange=()=>{fs.hidden=sel.value!=='__new';ds.innerHTML=devOpts(sel.value)};
+      const nd=f.querySelector('[data-newdev]'),room=f.querySelector('[data-room]'),ty=f.querySelector('[name=type]'),pr=f.querySelector('[name=price]'),ndp=f.querySelector('[name=nd_price]');
+      const devPrice=()=>{const x=ds.value;if(x.startsWith('cat:'))return +S.settings.catalog[+x.slice(4)].price||0;if(x==='__newdev')return +ndp.value||0;return 0};
+      const autoPrice=()=>{const t=ty.value==='__other'?0:typePrice(ty.value);const sum=t+devPrice();pr.value=sum||''};
+      const devUI=()=>{nd.hidden=ds.value!=='__newdev';room.hidden=!(ds.value==='__newdev'||ds.value.startsWith('cat:'))};
+      sel.onchange=()=>{fs.hidden=sel.value!=='__new';ds.innerHTML=devOpts(sel.value);devUI();autoPrice()};
+      ds.addEventListener('change',()=>{devUI();autoPrice();if(ds.value==='__newdev')f.querySelector('[name=nd_brand]').focus()});
+      ty.addEventListener('change',autoPrice);ndp.addEventListener('input',autoPrice);
+      if(isNew&&!j.price)autoPrice();
       const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati posao?'))return;await remove('jobs',j.id);close();render();toast('Posao obrisan')};
       const op=f.querySelector('[data-open]');if(op)op.onclick=()=>{close();go('klijent/'+j.clientId)};
     }});
@@ -528,21 +574,22 @@ async function finishJob(id){
   j.status='zavrseno';j.paid=paid;await save('jobs',j);toast('Posao završen');render();afterFinish(j);
 }
 async function afterFinish(j){
-  if(j.type==='Servis'&&j.deviceId){const d=device(j.deviceId);if(d){d.lastService=j.date;await save('devices',d);toast('Servis upisan — sledeći za '+(d.serviceMonths||12)+' meseci')}}
-  else if(j.type==='Ugradnja'&&!j.deviceId){if(confirm('Upisati ugrađenu klimu kod klijenta? Tako ti aplikacija javlja kad je vreme za servis.'))deviceForm({installDate:j.date},j.clientId,async d=>{j.deviceId=d.id;await save('jobs',j);render()})}
+  if(isService(j.type)&&j.deviceId){const d=device(j.deviceId);if(d){d.lastService=j.date;await save('devices',d);toast('Servis upisan — sledeći za '+(d.serviceMonths||12)+' meseci')}}
+  else if(isInstall(j.type)&&!j.deviceId){if(confirm('Upisati ugrađenu klimu kod klijenta? Tako ti aplikacija javlja kad je vreme za servis.'))deviceForm({installDate:j.date},j.clientId,async d=>{j.deviceId=d.id;await save('jobs',j);render()})}
 }
 
 function quoteForm(q={}){
   const isNew=!q.id;
   q={date:today(),items:[],...q};
   const clients=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'sr'));
+  const P=[...S.settings.catalog.map(c=>[catLabel(c),+c.price||0]),...S.settings.jobTypes.filter(t=>+t[1]>0),...S.settings.prices].filter((x,i,arr)=>arr.findIndex(y=>y[0].toLowerCase()===x[0].toLowerCase())===i);
   const itemRow=(i={name:'',qty:1,price:''})=>`<div class="qi"><input data-k="name" placeholder="Stavka" value="${esc(i.name)}"><input data-k="qty" type="number" inputmode="decimal" value="${esc(i.qty)}" aria-label="Količina"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena" value="${esc(i.price)}" aria-label="Cena"><button type="button" class="rm" aria-label="Ukloni">×</button></div>`;
   sheet(isNew?'Nova ponuda':'Izmeni ponudu',
     `<label class="f"><span>Klijent</span><select name="clientId"><option value="">— samo ime —</option>${clients.map(c=>`<option value="${c.id}" ${c.id===q.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
     <div data-cname ${q.clientId?'hidden':''}>${field('Ime (ako nije u klijentima)','clientName',q.clientName)}</div>
     ${field('Datum','date',q.date,'date')}
     <div class="f"><span>Stavke — dodirni iz cenovnika ili upiši</span></div>
-    <div class="presets"><button type="button" data-p="__dev">+ Klima uređaj</button>${S.settings.prices.map((p,i)=>`<button type="button" data-p="${i}">${esc(p[0])}</button>`).join('')}</div>
+    <div class="presets"><button type="button" data-p="__dev">+ Ručno uređaj</button>${P.map((p,i)=>`<button type="button" data-p="${i}">${esc(p[0])}</button>`).join('')}</div>
     <div data-items>${(q.items.length?q.items:[]).map(itemRow).join('')}</div>
     <button type="button" class="btn ghost small" data-add>+ Prazna stavka</button>
     <div class="qtotal"><span>Ukupno</span><span class="num" data-total>0 din</span></div>
@@ -563,7 +610,7 @@ function quoteForm(q={}){
       box.addEventListener('click',e=>{if(e.target.classList.contains('rm')){e.target.closest('.qi').remove();recalc()}});
       f.querySelector('[data-add]').onclick=()=>add({name:'',qty:1,price:''});
       f.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{if(b.dataset.p==='__dev'){add({name:'Klima uređaj ',qty:1,price:''});const inp=box.lastElementChild.querySelector('input');inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);return}
-        const p=S.settings.prices[+b.dataset.p];const ex=[...box.querySelectorAll('.qi')].find(r=>r.querySelector('[data-k=name]').value===p[0]);
+        const p=P[+b.dataset.p];const ex=[...box.querySelectorAll('.qi')].find(r=>r.querySelector('[data-k=name]').value===p[0]);
         if(ex){const qi=ex.querySelector('[data-k=qty]');qi.value=(+qi.value||0)+1;recalc()}else add({name:p[0],qty:1,price:p[1]})});
       const sel=f.querySelector('[name=clientId]'),cn=f.querySelector('[data-cname]');sel.onchange=()=>cn.hidden=!!sel.value;
       const d=f.querySelector('[data-del]');if(d)d.onclick=async()=>{if(!confirm('Obrisati ponudu?'))return;await remove('quotes',q.id);close();go('ponude')};
@@ -583,7 +630,7 @@ function serviceMenu(d){
     ()=>{},
     {onOpen:(f,close)=>{
       const v=f.querySelector('[data-viber]');if(v)v.addEventListener('click',()=>copy(msg));
-      f.querySelector('[data-sched]').onclick=()=>{close();jobForm({clientId:d.clientId,deviceId:d.id,type:'Servis',price:(S.settings.prices.find(p=>/servis/i.test(p[0]))||[])[1]||''})};
+      f.querySelector('[data-sched]').onclick=()=>{close();jobForm({clientId:d.clientId,deviceId:d.id,type:jobTypeNames().find(isService)||'Servis',price:typePrice(jobTypeNames().find(isService))||''})};
       f.querySelector('[data-done]').onclick=async()=>{d.lastService=today();await save('devices',d);close();render();toast('Upisan servis')};
       f.querySelector('[data-open]').onclick=()=>{close();go('klijent/'+d.clientId)};
     }});
@@ -593,6 +640,8 @@ function serviceMenu(d){
 const A={
   back:()=>history.length>1?history.back():go('danas'),
   go:el=>go(el.dataset.h),
+  addRow:el=>{const box=document.querySelector(`[data-list="${el.dataset.list}"]`);box.insertAdjacentHTML('beforeend',el.dataset.list==='types'?rowType():rowCat());box.lastElementChild.querySelector('input').focus()},
+  rmRow:el=>el.closest('.lr').remove(),
   hideHint:()=>{localStorage.setItem('hideHint','1');render()},
   newJob:el=>jobForm({clientId:el.dataset.cid}),
   editJob:el=>jobForm(S.jobs.find(j=>j.id===el.dataset.id)),
@@ -644,7 +693,10 @@ document.addEventListener('change',async e=>{const t=e.target;
 });
 document.addEventListener('submit',async e=>{const f=e.target;if(f.dataset.submit!=='saveSettings')return;e.preventDefault();const d=Object.fromEntries(new FormData(f));
   const prices=d.prices.split('\n').map(l=>l.split('=')).filter(p=>p[0].trim()).map(p=>[p[0].trim(),+(p[1]||'').replace(/[^\d]/g,'')||0]);
-  S.settings={...S.settings,firm:d.firm.trim(),phone:d.phone.trim(),warranty:+d.warranty||0,serviceMonths:+d.serviceMonths||12,prices,sms:d.sms};
+  const jobTypes=[...f.querySelectorAll('[data-list=types] .lr')].map(r=>[r.querySelector('[data-k=name]').value.trim(),+r.querySelector('[data-k=price]').value||0]).filter(t=>t[0]);
+  const catalog=[...f.querySelectorAll('[data-list=catalog] .lr')].map(r=>({brand:r.querySelector('[data-k=brand]').value.trim(),model:r.querySelector('[data-k=model]').value.trim(),btu:r.querySelector('[data-k=btu]').value.replace(/[^\d]/g,''),price:+r.querySelector('[data-k=price]').value||0})).filter(c=>c.brand||c.model);
+  if(!jobTypes.length){toast('Ostavi bar jednu vrstu posla');return}
+  S.settings={...S.settings,jobTypes,catalog,firm:d.firm.trim(),phone:d.phone.trim(),warranty:+d.warranty||0,serviceMonths:+d.serviceMonths||12,prices,sms:d.sms};
   await dbPut('meta',S.settings);toast('Podešavanja sačuvana');render()});
 
 /* ---------- start ---------- */
