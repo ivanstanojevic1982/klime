@@ -147,6 +147,14 @@ fieldset[hidden]{display:none}
 .lr input{padding:9px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:16px;min-width:0;width:100%}
 .lr .rm,.qi .rm{border:0;background:none;color:var(--red);font-size:22px;cursor:pointer}
 .sub{color:var(--muted);font-size:14px;margin:-4px 4px 10px}
+.firmseg{overflow-x:auto}
+.firmseg button{white-space:nowrap;padding:8px 10px}
+.wbox{display:flex;flex-wrap:wrap;gap:8px}
+.wchip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:7px 12px;cursor:pointer;font-weight:600;font-size:15px}
+.wchip input{width:18px;height:18px;margin:0}
+.wchip:has(input:checked){border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
+.muted{color:var(--muted);font-size:14px}
+a.row.card{padding:12px 14px}
 .presets{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
 .presets button{border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:6px 11px;font-size:13px;cursor:pointer}
 
@@ -184,9 +192,9 @@ fieldset[hidden]{display:none}
 <script>
 'use strict';
 /* ---------- baza (IndexedDB) ---------- */
-const STORES=['clients','devices','jobs','quotes','photos','meta'];
+const STORES=['clients','devices','jobs','quotes','photos','meta','firms','workers'];
 let DB;
-function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('klima-majstor',1);
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('klima-majstor',2);
   r.onupgradeneeded=()=>{const db=r.result;STORES.forEach(s=>{if(!db.objectStoreNames.contains(s)){const st=db.createObjectStore(s,{keyPath:'id'});if(s==='photos')st.createIndex('clientId','clientId')}})};
   r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function tx(store,mode,fn){return new Promise((res,rej)=>{const t=DB.transaction(store,mode);const st=t.objectStore(store);const out=fn(st);t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);t.onerror=()=>rej(t.error)})}
@@ -200,17 +208,41 @@ const DEFAULT_SETTINGS={id:'settings',firm:'',phone:'',warranty:24,serviceMonths
   jobTypes:[['Ugradnja',10000],['Servis',4000],['Popravka',0],['Demontaža',5000],['Pregled / ponuda',0]],catalog:[],
   prices:[['Dodatni metar instalacije',1500],['Konzola za spoljnu jedinicu',2500],['Proboj zida',1500],['Dopuna freona',5000]],
   sms:'Poštovani {ime}, prošlo je godinu dana od poslednjeg servisa vaše klime ({uredjaj}). Da zakažemo čišćenje i proveru? Pozdrav, {firma}'};
-const S={clients:[],devices:[],jobs:[],quotes:[],settings:{...DEFAULT_SETTINGS},lastBackup:null};
+const S={clients:[],devices:[],jobs:[],quotes:[],firms:[],workers:[],settings:{...DEFAULT_SETTINGS},lastBackup:null};
 
 async function load(){
-  for(const s of ['clients','devices','jobs','quotes'])S[s]=await dbAll(s);
+  for(const s of ['clients','devices','jobs','quotes','firms','workers'])S[s]=await dbAll(s);
   const meta=await dbAll('meta');
   const st=meta.find(m=>m.id==='settings');if(st)S.settings={...DEFAULT_SETTINGS,...st};
   const lb=meta.find(m=>m.id==='lastBackup');S.lastBackup=lb?lb.value:null;
+  // prva firma (prelaz sa stare verzije)
+  if(!S.firms.length)await save('firms',{id:uid(),name:S.settings.firm||'Moja firma',phone:S.settings.phone||''});
+  const f0=S.firms[0].id;
+  for(const j of S.jobs)if(!j.firmId||!firm(j.firmId)){j.firmId=f0;await save('jobs',j)}
+  for(const q of S.quotes)if(!q.firmId||!firm(q.firmId)){q.firmId=f0;await save('quotes',q)}
+  for(const w of S.workers)if(!firm(w.firmId)){w.firmId=f0;await save('workers',w)}
+  if(curFirm&&!firm(curFirm))setCurFirm('');
 }
 async function save(store,obj){obj.updated=Date.now();await dbPut(store,obj);const arr=S[store];const i=arr.findIndex(x=>x.id===obj.id);if(i>=0)arr[i]=obj;else arr.push(obj)}
 async function remove(store,id){await dbDel(store,id);S[store]=S[store].filter(x=>x.id!==id)}
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+/* ---------- firme i radnici ---------- */
+let curFirm='';try{curFirm=localStorage.getItem('curFirm')||''}catch(e){}
+function setCurFirm(id){curFirm=id;try{localStorage.setItem('curFirm',id)}catch(e){}}
+const firm=id=>S.firms.find(f=>f.id===id);
+const worker=id=>S.workers.find(w=>w.id===id);
+const multiFirm=()=>S.firms.length>1;
+const inFirm=x=>!curFirm||x.firmId===curFirm;
+const fJobs=()=>S.jobs.filter(inFirm);
+const firmName=()=>curFirm?firm(curFirm).name:(multiFirm()?'Sve firme':S.firms[0].name);
+const defFirm=()=>curFirm||S.firms[0].id;
+const workersOf=fid=>S.workers.filter(w=>w.firmId===fid).sort((a,b)=>a.name.localeCompare(b.name,'sr'));
+const workerNames=j=>(j.workerIds||[]).map(worker).filter(Boolean).map(w=>w.name).join(', ');
+function firmBar(){
+  if(!multiFirm())return '';
+  return `<div class="seg firmseg">${[['','Sve'],...S.firms.map(f=>[f.id,f.name])].map(([id,n])=>`<button class="${curFirm===id?'on':''}" data-act="pickFirm" data-id="${id}">${esc(n)}</button>`).join('')}</div>`;
+}
 
 /* ---------- pomoćne ---------- */
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -249,10 +281,10 @@ function nextService(d){const base=d.lastService||d.installDate;return base?addM
 function warrantyEnd(d){return d.installDate&&+d.warrantyMonths?addMonths(d.installDate,d.warrantyMonths):null}
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
 async function copy(text){try{await navigator.clipboard.writeText(text);return true}catch(e){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy')}catch(_){}ta.remove();return true}}
-function smsText(c,d){return (S.settings.sms||'').replace('{ime}',c?c.name:'').replace('{uredjaj}',devLabel(d)).replace('{firma}',S.settings.firm||'')}
+function smsText(c,d){return (S.settings.sms||'').replace('{ime}',c?c.name:'').replace('{uredjaj}',devLabel(d)).replace('{firma}',(firm(defFirm())||{}).name||'')}
 
 /* ---------- ruter ---------- */
-let jobFilter='upcoming',clientQuery='';
+let jobFilter='upcoming',clientQuery='',jobWorker='';
 function go(h){location.hash=h}
 window.addEventListener('hashchange',render);
 function header(title,{back,btn}={}){
@@ -262,7 +294,7 @@ function render(){
   const [route,param]=(location.hash.slice(1)||'danas').split('/');
   document.querySelectorAll('nav.tabs a').forEach(a=>a.classList.toggle('on',a.dataset.tab===route||(route==='klijent'&&a.dataset.tab==='klijenti')||(route==='ponuda'&&a.dataset.tab==='ponude')));
   const m=document.getElementById('main');
-  const views={danas:vToday,poslovi:vJobs,klijenti:vClients,klijent:vClient,servisi:vServices,ponude:vQuotes,ponuda:vQuote,podesavanja:vSettings};
+  const views={danas:vToday,poslovi:vJobs,klijenti:vClients,klijent:vClient,servisi:vServices,ponude:vQuotes,ponuda:vQuote,podesavanja:vSettings,firme:vFirms};
   m.innerHTML=(views[route]||vToday)(param);
   window.scrollTo(0,0);
   if(route==='klijent')loadPhotos(param);
@@ -270,18 +302,18 @@ function render(){
 
 /* ---------- DANAS ---------- */
 function vToday(){
-  header(S.settings.firm||'Klima Majstor',{btn:`<button class="tbtn" data-act="go" data-h="podesavanja" aria-label="Podešavanja">⚙︎</button>`});
+  header(firmName(),{btn:`<button class="tbtn" data-act="go" data-h="podesavanja" aria-label="Podešavanja">⚙︎</button>`});
   const t=today();
-  const upcoming=S.jobs.filter(j=>j.status==='zakazano'&&j.date>=t).sort((a,b)=>(a.date+(a.time||'99')).localeCompare(b.date+(b.time||'99')));
-  const late=S.jobs.filter(j=>j.status==='zakazano'&&j.date<t);
+  const upcoming=fJobs().filter(j=>j.status==='zakazano'&&j.date>=t).sort((a,b)=>(a.date+(a.time||'99')).localeCompare(b.date+(b.time||'99')));
+  const late=fJobs().filter(j=>j.status==='zakazano'&&j.date<t);
   const next=upcoming[0];
   const todayJobs=upcoming.filter(j=>j.date===t);
   const ym=t.slice(0,7);
-  const doneMonth=S.jobs.filter(j=>j.status==='zavrseno'&&(j.date||'').startsWith(ym));
+  const doneMonth=fJobs().filter(j=>j.status==='zavrseno'&&(j.date||'').startsWith(ym));
   const earned=doneMonth.reduce((s,j)=>s+(+j.price||0),0);
-  const unpaid=S.jobs.filter(j=>j.status==='zavrseno'&&!j.paid&&+j.price>0);
+  const unpaid=fJobs().filter(j=>j.status==='zavrseno'&&!j.paid&&+j.price>0);
   const dueSoon=S.devices.filter(d=>{const n=nextService(d);return n&&n<=addDays(t,30)});
-  let h='';
+  let h=firmBar();
   if(!window.matchMedia('(display-mode: standalone)').matches&&!navigator.standalone&&!localStorage.getItem('hideHint'))
     h+=`<div class="hint"><b>Dodaj aplikaciju na početni ekran</b>${isIOS?'U Safariju dodirni dugme Deli (kvadrat sa strelicom), pa „Dodaj na početni ekran”.':'U Chromeu otvori meni ⋮ i izaberi „Dodaj na početni ekran” ili „Instaliraj aplikaciju”.'} <a href="#" data-act="hideHint">Sakrij</a></div>`;
   if(S.clients.length&&(!S.lastBackup||daysBetween(S.lastBackup,t)>14))
@@ -291,7 +323,7 @@ function vToday(){
     h+=`<h2>Sledeći posao</h2><div class="plate">
       <div class="ph"><span>${esc(next.type)}</span><span class="num">${esc(relDay(next.date))}${next.time?' u '+esc(next.time):''}</span></div>
       <div class="pb" data-act="editJob" data-id="${next.id}" style="cursor:pointer"><div class="who">${esc(c.name||'Bez klijenta')}</div>
-      <dl>${c.address?`<dt>Adresa</dt><dd>${esc(c.address)}</dd>`:''}${c.phone?`<dt>Telefon</dt><dd class="num">${esc(c.phone)}</dd>`:''}${d?`<dt>Uređaj</dt><dd>${esc(devLabel(d))}</dd>`:''}${+next.price?`<dt>Cena</dt><dd class="num">${money(next.price)}</dd>`:''}${next.note?`<dt>Napomena</dt><dd>${esc(next.note)}</dd>`:''}</dl></div>
+      <dl>${c.address?`<dt>Adresa</dt><dd>${esc(c.address)}</dd>`:''}${c.phone?`<dt>Telefon</dt><dd class="num">${esc(c.phone)}</dd>`:''}${d?`<dt>Uređaj</dt><dd>${esc(devLabel(d))}</dd>`:''}${workerNames(next)?`<dt>Radnici</dt><dd>${esc(workerNames(next))}</dd>`:''}${!curFirm&&multiFirm()?`<dt>Firma</dt><dd>${esc((firm(next.firmId)||{}).name||'')}</dd>`:''}${+next.price?`<dt>Cena</dt><dd class="num">${money(next.price)}</dd>`:''}${next.note?`<dt>Napomena</dt><dd>${esc(next.note)}</dd>`:''}</dl></div>
       <div class="acts">${c.phone?`<a href="tel:${esc(intlPhone(c.phone))}">Pozovi</a>`:'<span></span>'}${c.address?`<a href="${mapLink(c.address)}" target="_blank" rel="noopener">Navigacija</a>`:'<span></span>'}<button data-act="finishJob" data-id="${next.id}">Završi</button></div>
     </div>`;
   }
@@ -316,16 +348,20 @@ function jobRow(j){
   const st=j.status==='zavrseno'?(+j.price&&!j.paid?'<span class="tag copper">nenaplaćeno</span>':'<span class="tag green">završeno</span>'):j.status==='otkazano'?'<span class="tag gray">otkazano</span>':(j.date<today()?'<span class="tag copper">kasni</span>':'');
   return `<div class="row" data-act="editJob" data-id="${j.id}">
     <div class="when"><b>${d.getDate()}.</b><span>${MON[d.getMonth()]}</span></div>
-    <div class="main"><div class="t">${esc(c.name||'Bez klijenta')}</div><div class="s">${esc(j.type)}${j.time?' · '+esc(j.time):''}${c.address?' · '+esc(c.address):''}</div></div>
+    <div class="main"><div class="t">${esc(c.name||'Bez klijenta')}</div><div class="s">${esc(j.type)}${j.time?' · '+esc(j.time):''}${c.address?' · '+esc(c.address):''}</div>${workerNames(j)||(!curFirm&&multiFirm())?`<div class="s">${!curFirm&&multiFirm()?`<span class="tag gray">${esc((firm(j.firmId)||{}).name||'')}</span> `:''}${esc(workerNames(j))}</div>`:''}</div>
     <div class="r">${+j.price?`<div class="num">${money(j.price)}</div>`:''}${st}</div></div>`;
 }
 function vJobs(){
   header('Poslovi',{btn:`<button class="tbtn" data-act="newJob">+ Novi</button>`});
   const t=today();let list;
-  if(jobFilter==='upcoming')list=S.jobs.filter(j=>j.status==='zakazano').sort((a,b)=>(a.date+(a.time||'99')).localeCompare(b.date+(b.time||'99')));
-  else if(jobFilter==='done')list=S.jobs.filter(j=>j.status!=='zakazano').sort((a,b)=>b.date.localeCompare(a.date));
-  else list=S.jobs.filter(j=>j.status==='zavrseno'&&!j.paid&&+j.price>0).sort((a,b)=>a.date.localeCompare(b.date));
-  let h=`<div class="seg">${[['upcoming','Zakazani'],['done','Završeni'],['unpaid','Nenaplaćeni']].map(([k,l])=>`<button class="${jobFilter===k?'on':''}" data-act="jobsFilter" data-f="${k}">${l}</button>`).join('')}</div>`;
+  const base=fJobs().filter(j=>!jobWorker||(j.workerIds||[]).includes(jobWorker));
+  if(jobFilter==='upcoming')list=base.filter(j=>j.status==='zakazano').sort((a,b)=>(a.date+(a.time||'99')).localeCompare(b.date+(b.time||'99')));
+  else if(jobFilter==='done')list=base.filter(j=>j.status!=='zakazano').sort((a,b)=>b.date.localeCompare(a.date));
+  else list=base.filter(j=>j.status==='zavrseno'&&!j.paid&&+j.price>0).sort((a,b)=>a.date.localeCompare(b.date));
+  const ws=S.workers.filter(w=>!curFirm||w.firmId===curFirm).sort((a,b)=>a.name.localeCompare(b.name,'sr'));
+  let h=firmBar();
+  if(ws.length)h+=`<select class="search" data-input="jobWorker" aria-label="Radnik"><option value="">Svi radnici</option>${ws.map(w=>`<option value="${w.id}" ${w.id===jobWorker?'selected':''}>${esc(w.name)}</option>`).join('')}</select>`;
+  h+=`<div class="seg">${[['upcoming','Zakazani'],['done','Završeni'],['unpaid','Nenaplaćeni']].map(([k,l])=>`<button class="${jobFilter===k?'on':''}" data-act="jobsFilter" data-f="${k}">${l}</button>`).join('')}</div>`;
   if(jobFilter==='unpaid'&&list.length)h+=`<div class="card" style="margin-bottom:12px">Ukupno da se naplati: <b class="num">${money(list.reduce((s,j)=>s+(+j.price||0),0))}</b></div>`;
   if(!list.length)return h+`<div class="list"><div class="empty">${jobFilter==='upcoming'?'Nema zakazanih poslova.<br><br><button class="btn" data-act="newJob">Zakaži posao</button>':jobFilter==='done'?'Još nema završenih poslova.':'Sve je naplaćeno.'}</div></div>`;
   // grupisanje po danu
@@ -400,13 +436,13 @@ const qTotal=q=>(q.items||[]).reduce((s,i)=>s+(+i.qty||0)*(+i.price||0),0);
 function quoteRow(q){const c=client(q.clientId);return `<a class="row" href="#ponuda/${q.id}"><div class="main"><div class="t">${esc(c?c.name:q.clientName||'Bez klijenta')}</div><div class="s">${esc(fmtDate(q.date))}${q.jobId?' · zakazano':''}</div></div><div class="r num">${money(qTotal(q))}</div></a>`}
 function vQuotes(){
   header('Ponude',{btn:`<button class="tbtn" data-act="newQuote">+ Nova</button>`});
-  const list=[...S.quotes].sort((a,b)=>b.date.localeCompare(a.date)||b.updated-a.updated);
-  if(!list.length)return `<div class="list"><div class="empty">Napravi ponudu iz cenovnika za par sekundi i pošalji je klijentu porukom ili kao PDF.<br><br><button class="btn" data-act="newQuote">Nova ponuda</button></div></div>`;
-  return `<div class="list">${list.map(quoteRow).join('')}</div>`;
+  const list=S.quotes.filter(inFirm).sort((a,b)=>b.date.localeCompare(a.date)||b.updated-a.updated);
+  if(!list.length)return firmBar()+`<div class="list"><div class="empty">Napravi ponudu iz cenovnika za par sekundi i pošalji je klijentu porukom ili kao PDF.<br><br><button class="btn" data-act="newQuote">Nova ponuda</button></div></div>`;
+  return firmBar()+`<div class="list">${list.map(quoteRow).join('')}</div>`;
 }
 function quoteText(q){
-  const c=client(q.clientId);const st=S.settings;
-  let t=`PONUDA${st.firm?' — '+st.firm:''}\n`;
+  const c=client(q.clientId);const st=firm(q.firmId)||S.firms[0];
+  let t=`PONUDA${st.name?' — '+st.name:''}\n`;
   if(c||q.clientName)t+=`Za: ${c?c.name:q.clientName}\n`;
   t+=`Datum: ${fmtDate(q.date)}\n\n`;
   (q.items||[]).forEach(i=>{const s=(+i.qty||0)*(+i.price||0);t+=`• ${i.name}${+i.qty!==1?` × ${i.qty}`:''}: ${money(s)}\n`});
@@ -435,8 +471,7 @@ function vSettings(){
   header('Podešavanja',{back:true});
   const s=S.settings;
   return `<form data-submit="saveSettings">
-    <div class="f"><span>Naziv firme</span><input name="firm" value="${esc(s.firm)}" placeholder="npr. Klima Servis Marko"></div>
-    <div class="f"><span>Tvoj telefon (ide u ponude)</span><input name="phone" type="tel" value="${esc(s.phone)}"></div>
+    <a class="row card" href="#firme" style="margin-bottom:14px"><div class="main"><div class="t">Firme i radnici</div><div class="s">${esc(S.firms.map(f=>f.name).join(', '))} · ${S.workers.length} ${S.workers.length===1?'radnik':'radnika'}</div></div><div class="r">›</div></a>
     <div class="two"><label class="f"><span>Garancija (meseci)</span><input name="warranty" type="number" inputmode="numeric" value="${esc(s.warranty)}"></label>
     <label class="f"><span>Servis na (meseci)</span><input name="serviceMonths" type="number" inputmode="numeric" value="${esc(s.serviceMonths)}"></label></div>
     <h2>Vrste posla i cene</h2><p class="sub">Cena se sama upiše kad izabereš vrstu posla. Uvek može da se promeni.</p>
@@ -452,7 +487,47 @@ function vSettings(){
     <div class="card"><p style="margin:0 0 10px;color:var(--muted);font-size:15px">Svi podaci i slike su samo na ovom telefonu. Kopiju sačuvaj u Fajlove, na Google Drive ili pošalji sebi mejlom.${S.lastBackup?' Poslednja kopija: '+esc(fmtDate(S.lastBackup))+'.':''}</p>
     <div class="btns"><button class="btn" data-act="exportData">Sačuvaj kopiju</button><label class="btn ghost">Vrati iz kopije<input type="file" accept=".json,application/json" hidden data-change="importData"></label></div></div>
     <h2>Opasna zona</h2><button class="btn danger wide" data-act="wipe">Obriši sve podatke</button>
-    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 7 · radi bez interneta</p>`;
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 8 · radi bez interneta</p>`;
+}
+
+/* ---------- FIRME I RADNICI ---------- */
+function vFirms(){
+  header('Firme i radnici',{back:true,btn:`<button class="tbtn" data-act="newFirm">+ Firma</button>`});
+  const t=today();
+  let h='<p class="sub" style="margin-top:0">Dodirni radnika da ga izmeniš ili prebaciš u drugu firmu.</p>';
+  for(const f of S.firms){
+    const ws=workersOf(f.id);
+    h+=`<h2 style="display:flex;justify-content:space-between;align-items:center"><span>${esc(f.name)}</span><button class="btn small ghost" data-act="editFirm" data-id="${f.id}">Izmeni</button></h2>
+    <div class="list">${ws.map(w=>{const n=S.jobs.filter(j=>j.status==='zakazano'&&j.date>=t&&(j.workerIds||[]).includes(w.id)).length;
+      return `<div class="row" data-act="editWorker" data-id="${w.id}"><div class="main"><div class="t">${esc(w.name)}</div><div class="s">${esc(w.phone||'')}</div></div><div class="r">${n?n+' zakaz.':''}</div></div>`}).join('')}
+    <div class="row" data-act="newWorker" data-fid="${f.id}" style="color:var(--blue);font-weight:600">+ Dodaj radnika</div></div>`;
+  }
+  return h;
+}
+function firmForm(f={}){
+  const isNew=!f.id;
+  sheet(isNew?'Nova firma':'Izmeni firmu',
+    field('Naziv firme','name',f.name,'text','required')+field('Telefon (ide u ponude)','phone',f.phone,'tel')+
+    `<button class="btn wide">Sačuvaj</button>`+(isNew||S.firms.length<2?'':`<button type="button" class="btn danger wide" style="margin-top:10px" data-del>Obriši firmu</button>`),
+    async v=>{await save('firms',{...f,name:v.name.trim(),phone:v.phone.trim(),id:f.id||uid()});toast('Firma sačuvana')},
+    {onOpen:(fm,close)=>{const b=fm.querySelector('[data-del]');if(b)b.onclick=async()=>{
+      const used=S.jobs.some(j=>j.firmId===f.id)||S.workers.some(w=>w.firmId===f.id)||S.quotes.some(q=>q.firmId===f.id);
+      if(used){toast('Firma ima radnike, poslove ili ponude — prvo ih prebaci u drugu firmu');return}
+      if(!confirm('Obrisati firmu '+f.name+'?'))return;await remove('firms',f.id);if(curFirm===f.id)setCurFirm('');close();render()}}});
+}
+function workerForm(w={}){
+  const isNew=!w.id;const t=today();
+  const jobs=isNew?[]:S.jobs.filter(j=>j.status==='zakazano'&&j.date>=t&&(j.workerIds||[]).includes(w.id)).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||''))).slice(0,6);
+  sheet(isNew?'Novi radnik':w.name,
+    field('Ime i prezime','name',w.name,'text','required autocomplete="off"')+field('Telefon','phone',w.phone,'tel')+
+    `<label class="f"><span>Firma</span><select name="firmId">${S.firms.map(f=>`<option value="${f.id}" ${f.id===w.firmId?'selected':''}>${esc(f.name)}</option>`).join('')}</select></label>`+
+    (jobs.length?`<div class="f"><span>Zakazani poslovi</span></div><div class="list" style="margin-bottom:14px">${jobs.map(j=>{const c=client(j.clientId)||{};return `<div class="row"><div class="main"><div class="t">${esc(c.name||'')}</div><div class="s">${esc(relDay(j.date))}${j.time?' u '+esc(j.time):''} · ${esc(j.type)}</div></div></div>`}).join('')}</div>`:'')+
+    `<button class="btn wide">Sačuvaj</button>`+(w.phone?`<a class="btn ghost wide" style="margin-top:10px" href="tel:${esc(intlPhone(w.phone))}">Pozovi</a>`:'')+
+    (isNew?'':`<button type="button" class="btn danger wide" style="margin-top:10px" data-del>Obriši radnika</button>`),
+    async v=>{const moved=!isNew&&w.firmId!==v.firmId;await save('workers',{...w,name:v.name.trim(),phone:v.phone.trim(),firmId:v.firmId,id:w.id||uid()});toast(moved?'Radnik prebačen u '+firm(v.firmId).name:'Radnik sačuvan')},
+    {onOpen:(fm,close)=>{const b=fm.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati radnika '+w.name+'? Biće skinut i sa zakazanih poslova.'))return;
+      for(const j of S.jobs)if((j.workerIds||[]).includes(w.id)){j.workerIds=j.workerIds.filter(x=>x!==w.id);await save('jobs',j)}
+      await remove('workers',w.id);if(jobWorker===w.id)jobWorker='';close();render()}}});
 }
 
 /* ---------- forme (sheet) ---------- */
@@ -479,6 +554,10 @@ function combo(label,name,opts,val,{suffix='',empty=true}={}){
 }
 function comboVal(v,name){const r=v[name]==='__other'?(v[name+'_other']||'').trim():v[name];delete v[name+'_other'];return r}
 /* vreme: sat + minut kao obični izbori (radi i na iPhoneu bez dugmeta "Sačuvaj") */
+function firmSelect(val){
+  const v=val||defFirm();
+  return `<label class="f"><span>Firma</span><select name="firmId">${S.firms.map(f=>`<option value="${f.id}" ${f.id===v?'selected':''}>${esc(f.name)}</option>`).join('')}</select></label>`;
+}
 function timeSel(val){
   const [h,m]=(val||'').split(':');const mins=['00','15','30','45'];if(m&&!mins.includes(m))mins.push(m);
   const hh=h||'08';let hs='';for(let i=6;i<=22;i++){const x=pad(i);hs+=`<option ${x===hh?'selected':''}>${x}</option>`}hs+='<option value="">bez vremena</option>';
@@ -530,7 +609,7 @@ function jobForm(j={},opts={}){
     (cat.length?`<optgroup label="Dodaj uređaj">${cat.map((c,i)=>`<option value="cat:${i}">${esc(catLabel(c))}${+c.price?' — '+money(c.price):''}</option>`).join('')}</optgroup>`:'')+
     `<option value="__newdev">+ Novi uređaj (upiši)</option>`};
   sheet(isNew?'Novi posao':'Posao',
-    `<label class="f"><span>Klijent</span><select name="clientId">${clients.length?'':'<option value="__new">+ Novi klijent</option>'}${clients.map(c=>`<option value="${c.id}" ${c.id===j.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}${clients.length?'<option value="__new">+ Novi klijent</option>':''}</select></label>
+    firmSelect(j.firmId)+`<label class="f"><span>Klijent</span><select name="clientId">${clients.length?'':'<option value="__new">+ Novi klijent</option>'}${clients.map(c=>`<option value="${c.id}" ${c.id===j.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}${clients.length?'<option value="__new">+ Novi klijent</option>':''}</select></label>
     <fieldset data-newc ${clients.length?'hidden':''}>${field('Ime i prezime','nc_name')}${field('Telefon','nc_phone','','tel')}${field('Adresa','nc_address')}</fieldset>
     ${combo('Vrsta posla','type',jobTypeNames(),j.type,{empty:false})}
     ${field('Datum','date',j.date,'date','required')}${timeSel(j.time)}
@@ -539,11 +618,12 @@ function jobForm(j={},opts={}){
     <fieldset data-newdev hidden><div class="two">${combo('Marka','nd_brand',brandList(),'')}${combo('Snaga (BTU)','nd_btu',BTUS,'')}</div>${field('Model','nd_model')}${field('Cena uređaja (din)','nd_price','','number','inputmode="numeric"')}<label class="chk"><input type="checkbox" name="nd_save" checked> Zapamti u katalogu</label></fieldset>
     <div data-room hidden>${field('Prostorija (dnevna, spavaća...)','nd_room')}</div>
     <div class="two">${field('Cena (din)','price',j.price,'number','inputmode="numeric"')}<label class="f"><span>Status</span><select name="status"><option value="zakazano" ${j.status==='zakazano'?'selected':''}>Zakazano</option><option value="zavrseno" ${j.status==='zavrseno'?'selected':''}>Završeno</option><option value="otkazano" ${j.status==='otkazano'?'selected':''}>Otkazano</option></select></label></div>
+    <div class="f"><span>Radnici na poslu</span><div data-workers class="wbox"></div></div>
     <label class="chk"><input type="checkbox" name="paid" ${j.paid?'checked':''}> Naplaćeno</label>
     ${area('Napomena','note',j.note)}
     <button class="btn wide">Sačuvaj</button>
     ${isNew?'':`<div class="btns" style="margin-top:10px"><button type="button" class="btn ghost" style="flex:1" data-open>Otvori klijenta</button><button type="button" class="btn danger" style="flex:1" data-del>Obriši</button></div>`}`,
-    async v=>{
+    async (v,f)=>{
       let cid=v.clientId;v.type=comboVal(v,'type')||'Posao';v.time=v.th?v.th+':'+v.tm:'';
       if(cid==='__new'){if(!v.nc_name){toast('Upiši ime klijenta');return false}const c={id:uid(),name:v.nc_name,phone:v.nc_phone,address:v.nc_address};await save('clients',c);cid=c.id}
       let devId=v.deviceId;
@@ -558,7 +638,7 @@ function jobForm(j={},opts={}){
       }
       v.deviceId=devId;
       const wasDone=j.status==='zavrseno';
-      const o={...j,id:j.id||uid(),clientId:cid,type:v.type,date:v.date,time:v.time,deviceId:v.deviceId,price:v.price,status:v.status,paid:v.paid,note:v.note,quoteId:j.quoteId};
+      const o={...j,id:j.id||uid(),firmId:v.firmId||defFirm(),workerIds:[...f.querySelectorAll('[data-workers] input:checked')].map(x=>x.value),clientId:cid,type:v.type,date:v.date,time:v.time,deviceId:v.deviceId,price:v.price,status:v.status,paid:v.paid,note:v.note,quoteId:j.quoteId};
       await save('jobs',o);
       if(o.quoteId){const q=S.quotes.find(x=>x.id===o.quoteId);if(q&&!q.jobId){q.jobId=o.id;await save('quotes',q)}}
       toast('Posao sačuvan');
@@ -574,6 +654,12 @@ function jobForm(j={},opts={}){
       ds.addEventListener('change',()=>{devUI();autoPrice();if(ds.value==='__newdev')f.querySelector('[name=nd_brand]').focus()});
       ty.addEventListener('change',autoPrice);ndp.addEventListener('input',autoPrice);
       if(isNew&&!j.price)autoPrice();
+      const wb=f.querySelector('[data-workers]'),fsel=f.querySelector('[name=firmId]');
+      const drawW=()=>{const fid=fsel?fsel.value:defFirm();const cur=(j.workerIds||[]);
+        const list=[...workersOf(fid),...cur.map(worker).filter(w=>w&&w.firmId!==fid)];
+        wb.innerHTML=list.length?list.map(w=>`<label class="wchip"><input type="checkbox" value="${w.id}" ${cur.includes(w.id)?'checked':''}><span>${esc(w.name)}</span></label>`).join(''):`<span class="muted">Ova firma nema radnike. <a href="#firme" data-closesheet>Dodaj radnike</a></span>`};
+      drawW();if(fsel)fsel.addEventListener('change',()=>{j.workerIds=[...wb.querySelectorAll('input:checked')].map(x=>x.value);drawW()});
+      wb.addEventListener('click',e=>{if(e.target.closest('[data-closesheet]'))close()});
       const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati posao?'))return;await remove('jobs',j.id);close();render();toast('Posao obrisan')};
       const op=f.querySelector('[data-open]');if(op)op.onclick=()=>{close();go('klijent/'+j.clientId)};
     }});
@@ -595,7 +681,7 @@ function quoteForm(q={}){
   const P=[...S.settings.catalog.map(c=>[catLabel(c),+c.price||0]),...S.settings.jobTypes.filter(t=>+t[1]>0),...S.settings.prices].filter((x,i,arr)=>arr.findIndex(y=>y[0].toLowerCase()===x[0].toLowerCase())===i);
   const itemRow=(i={name:'',qty:1,price:''})=>`<div class="qi"><input data-k="name" placeholder="Stavka" value="${esc(i.name)}"><input data-k="qty" type="number" inputmode="decimal" value="${esc(i.qty)}" aria-label="Količina"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena" value="${esc(i.price)}" aria-label="Cena"><button type="button" class="rm" aria-label="Ukloni">×</button></div>`;
   sheet(isNew?'Nova ponuda':'Izmeni ponudu',
-    `<label class="f"><span>Klijent</span><select name="clientId"><option value="">— samo ime —</option>${clients.map(c=>`<option value="${c.id}" ${c.id===q.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+    firmSelect(q.firmId)+`<label class="f"><span>Klijent</span><select name="clientId"><option value="">— samo ime —</option>${clients.map(c=>`<option value="${c.id}" ${c.id===q.clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
     <div data-cname ${q.clientId?'hidden':''}>${field('Ime (ako nije u klijentima)','clientName',q.clientName)}</div>
     ${field('Datum','date',q.date,'date')}
     <div class="f"><span>Stavke — dodirni iz cenovnika ili upiši</span></div>
@@ -609,7 +695,7 @@ function quoteForm(q={}){
     async (v,f)=>{
       const items=[...f.querySelectorAll('.qi')].map(r=>({name:r.querySelector('[data-k=name]').value.trim(),qty:+r.querySelector('[data-k=qty]').value||1,price:+r.querySelector('[data-k=price]').value||0})).filter(i=>i.name||i.price);
       if(!items.length){toast('Dodaj bar jednu stavku');return false}
-      const o={...q,id:q.id||uid(),clientId:v.clientId,clientName:v.clientId?'':v.clientName,date:v.date,note:v.note,items};
+      const o={...q,id:q.id||uid(),firmId:v.firmId||defFirm(),clientId:v.clientId,clientName:v.clientId?'':v.clientName,date:v.date,note:v.note,items};
       await save('quotes',o);toast('Ponuda sačuvana');go('ponuda/'+o.id);
     },
     {onOpen:(f,close)=>{
@@ -652,6 +738,11 @@ const A={
   go:el=>go(el.dataset.h),
   addRow:el=>{const box=document.querySelector(`[data-list="${el.dataset.list}"]`);box.insertAdjacentHTML('beforeend',el.dataset.list==='types'?rowType():rowCat());box.lastElementChild.querySelector('input').focus()},
   rmRow:el=>el.closest('.lr').remove(),
+  pickFirm:el=>{setCurFirm(el.dataset.id);jobWorker='';render()},
+  newFirm:()=>firmForm(),
+  editFirm:el=>firmForm(firm(el.dataset.id)),
+  newWorker:el=>workerForm({firmId:el.dataset.fid}),
+  editWorker:el=>workerForm(worker(el.dataset.id)),
   hideHint:()=>{localStorage.setItem('hideHint','1');render()},
   newJob:el=>jobForm({clientId:el.dataset.cid}),
   editJob:el=>jobForm(S.jobs.find(j=>j.id===el.dataset.id)),
@@ -666,8 +757,8 @@ const A={
   editQuote:el=>quoteForm(S.quotes.find(q=>q.id===el.dataset.id)),
   shareQuote:async el=>{const t=quoteText(S.quotes.find(q=>q.id===el.dataset.id));
     if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{await copy(t);toast('Ponuda kopirana — nalepi je u poruku')}},
-  printQuote:el=>{const q=S.quotes.find(x=>x.id===el.dataset.id);const c=client(q.clientId);const st=S.settings;
-    document.getElementById('print').innerHTML=`<h1 style="margin:0">${esc(st.firm||'Ponuda')}</h1>${st.phone?`<div>${esc(st.phone)}</div>`:''}<h2 style="margin-top:24px">Ponuda</h2><div>Za: <b>${esc(c?c.name:q.clientName||'')}</b>${c&&c.address?', '+esc(c.address):''}</div><div>Datum: ${esc(fmtDate(q.date))}</div>
+  printQuote:el=>{const q=S.quotes.find(x=>x.id===el.dataset.id);const c=client(q.clientId);const st=firm(q.firmId)||S.firms[0];
+    document.getElementById('print').innerHTML=`<h1 style="margin:0">${esc(st.name||'Ponuda')}</h1>${st.phone?`<div>${esc(st.phone)}</div>`:''}<h2 style="margin-top:24px">Ponuda</h2><div>Za: <b>${esc(c?c.name:q.clientName||'')}</b>${c&&c.address?', '+esc(c.address):''}</div><div>Datum: ${esc(fmtDate(q.date))}</div>
     <table><tr><th>Stavka</th><th class="r">Kol.</th><th class="r">Cena</th><th class="r">Iznos</th></tr>${q.items.map(i=>`<tr><td>${esc(i.name)}</td><td class="r">${esc(i.qty)}</td><td class="r">${money(i.price)}</td><td class="r">${money(i.qty*i.price)}</td></tr>`).join('')}
     <tr><td colspan="3"><b>Ukupno</b></td><td class="r"><b>${money(qTotal(q))}</b></td></tr></table>${q.note?`<p style="white-space:pre-wrap">${esc(q.note)}</p>`:''}`;
     window.print()},
@@ -693,6 +784,7 @@ const A={
     for(const s of STORES)await dbClear(s);await load();toast('Sve obrisano');go('danas')}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;if(el.tagName!=='A'||el.getAttribute('href')==='#')e.preventDefault();const f=A[el.dataset.act];if(f)f(el,e)});
+document.addEventListener('change',e=>{if(e.target.dataset.input==='jobWorker'){jobWorker=e.target.value;render()}});
 document.addEventListener('input',e=>{if(e.target.dataset.input==='clientSearch'){clientQuery=e.target.value;const pos=e.target.selectionStart;render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(pos,pos)}});
 document.addEventListener('change',async e=>{const t=e.target;
   if(t.dataset.change==='addPhoto'){const files=[...t.files];if(!files.length)return;toast('Čuvam '+(files.length>1?files.length+' slike':'sliku')+'…');
@@ -706,7 +798,7 @@ document.addEventListener('submit',async e=>{const f=e.target;if(f.dataset.submi
   const jobTypes=[...f.querySelectorAll('[data-list=types] .lr')].map(r=>[r.querySelector('[data-k=name]').value.trim(),+r.querySelector('[data-k=price]').value||0]).filter(t=>t[0]);
   const catalog=[...f.querySelectorAll('[data-list=catalog] .lr')].map(r=>({brand:r.querySelector('[data-k=brand]').value.trim(),model:r.querySelector('[data-k=model]').value.trim(),btu:r.querySelector('[data-k=btu]').value.replace(/[^\d]/g,''),price:+r.querySelector('[data-k=price]').value||0})).filter(c=>c.brand||c.model);
   if(!jobTypes.length){toast('Ostavi bar jednu vrstu posla');return}
-  S.settings={...S.settings,jobTypes,catalog,firm:d.firm.trim(),phone:d.phone.trim(),warranty:+d.warranty||0,serviceMonths:+d.serviceMonths||12,prices,sms:d.sms};
+  S.settings={...S.settings,jobTypes,catalog,warranty:+d.warranty||0,serviceMonths:+d.serviceMonths||12,prices,sms:d.sms};
   await dbPut('meta',S.settings);toast('Podešavanja sačuvana');render()});
 
 /* ---------- start ---------- */
