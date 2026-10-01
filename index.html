@@ -141,6 +141,9 @@ fieldset[hidden]{display:none}
 .qtotal{display:flex;justify-content:space-between;font-size:20px;font-weight:750;padding:12px 2px;border-top:2px solid var(--ink);margin-top:8px}
 .lr{display:grid;grid-template-columns:1fr 110px 30px;gap:6px;margin-bottom:8px;align-items:center}
 .lr.cat{grid-template-columns:1fr 1fr 30px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
+.bsel select{width:100%;padding:9px 6px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:16px;min-width:0}
+.bsel input{margin-top:6px}
+.lr input[hidden]{display:none}
 .lr input{padding:9px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:16px;min-width:0;width:100%}
 .lr .rm,.qi .rm{border:0;background:none;color:var(--red);font-size:22px;cursor:pointer}
 .sub{color:var(--muted);font-size:14px;margin:-4px 4px 10px}
@@ -233,6 +236,9 @@ const devLabel=d=>d?[d.brand,d.model,d.btu?d.btu+' BTU':''].filter(Boolean).join
 const jobTypeNames=()=>S.settings.jobTypes.map(t=>t[0]);
 const typePrice=name=>{const t=S.settings.jobTypes.find(t=>t[0]===name);return t?+t[1]||0:0};
 const isInstall=t=>/ugrad/i.test(t||''),isService=t=>/servis/i.test(t||'');
+const brandList=()=>[...new Set([...BRANDS,...S.settings.catalog.map(c=>c.brand),...S.devices.map(d=>d.brand)].filter(Boolean))];
+function setCombo(f,name,val){const sel=f.querySelector(`[name="${name}"]`),o=f.querySelector(`[name="${name}_other"]`);const has=[...sel.options].some(x=>x.value===String(val||''));
+  if(!val||has){sel.value=val||'';o.hidden=true;o.value=''}else{sel.value='__other';o.value=val;o.hidden=false}}
 const catLabel=c=>[c.brand,c.model,c.btu?c.btu+' BTU':''].filter(Boolean).join(' ');
 const BRANDS=['Gree','Midea','Daikin','Mitsubishi Electric','Mitsubishi Heavy','LG','Samsung','Vivax','Tesla','Fujitsu','Toshiba','Panasonic','Hisense','Haier','Bosch','Sinclair','Hyundai','Electrolux','Cooper&Hunter','Fujiko'];
 const BTUS=['7000','9000','12000','18000','24000','36000','48000'];
@@ -421,7 +427,7 @@ function vQuote(id){
 
 /* ---------- PODEŠAVANJA ---------- */
 const rowType=(t=['',''])=>`<div class="lr"><input data-k="name" placeholder="Naziv posla" value="${esc(t[0])}"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena" value="${esc(t[1]||'')}"><button type="button" class="rm" data-act="rmRow" aria-label="Ukloni">×</button></div>`;
-const rowCat=(c={})=>`<div class="lr cat"><input data-k="brand" list="brands" placeholder="Marka" value="${esc(c.brand)}"><input data-k="model" placeholder="Model" value="${esc(c.model)}"><button type="button" class="rm" data-act="rmRow" aria-label="Ukloni">×</button><input data-k="btu" inputmode="numeric" placeholder="BTU (npr. 12000)" value="${esc(c.btu)}"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena uređaja" value="${esc(c.price||'')}"></div>`;
+const rowCat=(c={})=>`<div class="lr cat"><div class="bsel">${(()=>{const L=brandList();const known=!c.brand||L.includes(c.brand);return `<select data-bs><option value="">Marka…</option>${L.map(b=>`<option ${b===c.brand?'selected':''}>${esc(b)}</option>`).join('')}<option value="__other" ${known?'':'selected'}>Drugo (upiši)…</option></select><input data-k="brand" placeholder="Upiši marku" value="${esc(c.brand)}" ${known?'hidden':''}>`})()}</div><input data-k="model" placeholder="Model" value="${esc(c.model)}"><button type="button" class="rm" data-act="rmRow" aria-label="Ukloni">×</button><input data-k="btu" inputmode="numeric" placeholder="BTU (npr. 12000)" value="${esc(c.btu)}"><input data-k="price" type="number" inputmode="numeric" placeholder="Cena uređaja" value="${esc(c.price||'')}"></div>`;
 function vSettings(){
   header('Podešavanja',{back:true});
   const s=S.settings;
@@ -443,7 +449,7 @@ function vSettings(){
     <div class="card"><p style="margin:0 0 10px;color:var(--muted);font-size:15px">Svi podaci i slike su samo na ovom telefonu. Kopiju sačuvaj u Fajlove, na Google Drive ili pošalji sebi mejlom.${S.lastBackup?' Poslednja kopija: '+esc(fmtDate(S.lastBackup))+'.':''}</p>
     <div class="btns"><button class="btn" data-act="exportData">Sačuvaj kopiju</button><label class="btn ghost">Vrati iz kopije<input type="file" accept=".json,application/json" hidden data-change="importData"></label></div></div>
     <h2>Opasna zona</h2><button class="btn danger wide" data-act="wipe">Obriši sve podatke</button>
-    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 5 · radi bez interneta</p>`;
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 6 · radi bez interneta</p>`;
 }
 
 /* ---------- forme (sheet) ---------- */
@@ -475,6 +481,7 @@ function timeSel(val){
   const hh=h||'08';let hs='';for(let i=6;i<=22;i++){const x=pad(i);hs+=`<option ${x===hh?'selected':''}>${x}</option>`}hs+='<option value="">bez vremena</option>';
   return `<label class="f"><span>Vreme</span><div style="display:flex;gap:6px;align-items:center"><select name="th" aria-label="Sat">${hs}</select><b>:</b><select name="tm" aria-label="Minut">${mins.map(x=>`<option ${x===(m||'00')?'selected':''}>${x}</option>`).join('')}</select></div></label>`;
 }
+document.addEventListener('change',e=>{const t=e.target;if(t.matches&&t.matches('[data-bs]')){const i=t.parentNode.querySelector('[data-k=brand]');if(t.value==='__other'){i.hidden=false;i.value='';i.focus()}else{i.hidden=true;i.value=t.value}}});
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset&&t.dataset.combo){const o=t.form.querySelector(`[name="${t.dataset.combo}_other"]`);o.hidden=t.value!=='__other';if(!o.hidden)o.focus()}});
 
 function clientForm(c={},after){
@@ -497,15 +504,15 @@ function deviceForm(d={},cid,after){
   sheet(isNew?'Novi uređaj':'Izmeni uređaj',
     `<datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>`+
     (S.settings.catalog.length?`<label class="f"><span>Izaberi iz kataloga (popuni polja)</span><select data-fromcat><option value="">—</option>${S.settings.catalog.map((c,i)=>`<option value="${i}">${esc(catLabel(c))}</option>`).join('')}</select></label>`:'')+
-    `<div class="two">${field('Marka','brand',d.brand,'text','list="brands" autocomplete="off"')}${combo('Snaga (BTU)','btu',BTUS,d.btu)}</div>`+
+    `<div class="two">${combo('Marka','brand',brandList(),d.brand)}${combo('Snaga (BTU)','btu',BTUS,d.btu)}</div>`+
     field('Model','model',d.model)+field('Prostorija (dnevna, spavaća...)','room',d.room)+
     `<div class="two">${field('Datum ugradnje','installDate',d.installDate,'date')}${field('Poslednji servis','lastService',d.lastService,'date')}</div>`+
     `<div class="two">${field('Garancija (meseci)','warrantyMonths',d.warrantyMonths,'number','inputmode="numeric"')}${field('Servis na (meseci)','serviceMonths',d.serviceMonths,'number','inputmode="numeric"')}</div>`+
     area('Napomena (freon, dužina instalacije...)','note',d.note)+
     `<button class="btn wide">Sačuvaj</button>`+(isNew?'':`<button type="button" class="btn danger wide" style="margin-top:10px" data-del>Obriši uređaj</button>`),
-    async v=>{v.btu=comboVal(v,'btu');const o={...d,...v,clientId:d.clientId||cid,id:d.id||uid()};await save('devices',o);toast('Uređaj sačuvan');if(after)after(o)},
+    async v=>{v.btu=comboVal(v,'btu');v.brand=comboVal(v,'brand');const o={...d,...v,clientId:d.clientId||cid,id:d.id||uid()};await save('devices',o);toast('Uređaj sačuvan');if(after)after(o)},
     {onOpen:(f,close)=>{const fc=f.querySelector('[data-fromcat]');if(fc)fc.onchange=()=>{const c=S.settings.catalog[+fc.value];if(!c)return;
-        f.querySelector('[name=brand]').value=c.brand||'';f.querySelector('[name=model]').value=c.model||'';
+        setCombo(f,'brand',c.brand);f.querySelector('[name=model]').value=c.model||'';
         const bs=f.querySelector('[name=btu]'),bo=f.querySelector('[name=btu_other]');if(!c.btu||BTUS.includes(String(c.btu))){bs.value=c.btu||'';bo.hidden=true}else{bs.value='__other';bo.value=c.btu;bo.hidden=false}};
       const b=f.querySelector('[data-del]');if(b)b.onclick=async()=>{if(!confirm('Obrisati uređaj?'))return;await remove('devices',d.id);close();render()}}});
 }
@@ -526,7 +533,7 @@ function jobForm(j={},opts={}){
     ${field('Datum','date',j.date,'date','required')}${timeSel(j.time)}
     <label class="f"><span>Uređaj</span><select name="deviceId">${devOpts(j.clientId||(clients[0]||{}).id)}</select></label>
     <datalist id="brands">${BRANDS.map(b=>`<option value="${b}">`).join('')}</datalist>
-    <fieldset data-newdev hidden><div class="two">${field('Marka','nd_brand','','text','list="brands" autocomplete="off"')}${combo('Snaga (BTU)','nd_btu',BTUS,'')}</div>${field('Model','nd_model')}${field('Cena uređaja (din)','nd_price','','number','inputmode="numeric"')}<label class="chk"><input type="checkbox" name="nd_save" checked> Zapamti u katalogu</label></fieldset>
+    <fieldset data-newdev hidden><div class="two">${combo('Marka','nd_brand',brandList(),'')}${combo('Snaga (BTU)','nd_btu',BTUS,'')}</div>${field('Model','nd_model')}${field('Cena uređaja (din)','nd_price','','number','inputmode="numeric"')}<label class="chk"><input type="checkbox" name="nd_save" checked> Zapamti u katalogu</label></fieldset>
     <div data-room hidden>${field('Prostorija (dnevna, spavaća...)','nd_room')}</div>
     <div class="two">${field('Cena (din)','price',j.price,'number','inputmode="numeric"')}<label class="f"><span>Status</span><select name="status"><option value="zakazano" ${j.status==='zakazano'?'selected':''}>Zakazano</option><option value="zavrseno" ${j.status==='zavrseno'?'selected':''}>Završeno</option><option value="otkazano" ${j.status==='otkazano'?'selected':''}>Otkazano</option></select></label></div>
     <label class="chk"><input type="checkbox" name="paid" ${j.paid?'checked':''}> Naplaćeno</label>
@@ -539,7 +546,7 @@ function jobForm(j={},opts={}){
       let devId=v.deviceId;
       if(devId&&(devId.startsWith('cat:')||devId==='__newdev')){
         let base;
-        if(devId==='__newdev'){const btu=comboVal(v,'nd_btu');if(!v.nd_brand.trim()&&!v.nd_model.trim()){toast('Upiši marku ili model uređaja');return false}
+        if(devId==='__newdev'){const btu=comboVal(v,'nd_btu');v.nd_brand=comboVal(v,'nd_brand')||'';if(!v.nd_brand.trim()&&!v.nd_model.trim()){toast('Upiši marku ili model uređaja');return false}
           base={brand:v.nd_brand.trim(),model:v.nd_model.trim(),btu};
           if(v.nd_save&&!S.settings.catalog.some(c=>catLabel(c)===catLabel(base))){S.settings.catalog.push({...base,price:+v.nd_price||0});await dbPut('meta',S.settings)}}
         else{const c=S.settings.catalog[+devId.slice(4)];base={brand:c.brand,model:c.model,btu:c.btu}}
