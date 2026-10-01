@@ -443,7 +443,7 @@ function vSettings(){
     <div class="card"><p style="margin:0 0 10px;color:var(--muted);font-size:15px">Svi podaci i slike su samo na ovom telefonu. Kopiju sačuvaj u Fajlove, na Google Drive ili pošalji sebi mejlom.${S.lastBackup?' Poslednja kopija: '+esc(fmtDate(S.lastBackup))+'.':''}</p>
     <div class="btns"><button class="btn" data-act="exportData">Sačuvaj kopiju</button><label class="btn ghost">Vrati iz kopije<input type="file" accept=".json,application/json" hidden data-change="importData"></label></div></div>
     <h2>Opasna zona</h2><button class="btn danger wide" data-act="wipe">Obriši sve podatke</button>
-    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 4 · radi bez interneta</p>`;
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px">Klima Majstor · verzija 5 · radi bez interneta</p>`;
 }
 
 /* ---------- forme (sheet) ---------- */
@@ -472,7 +472,7 @@ function comboVal(v,name){const r=v[name]==='__other'?(v[name+'_other']||'').tri
 /* vreme: sat + minut kao obični izbori (radi i na iPhoneu bez dugmeta "Sačuvaj") */
 function timeSel(val){
   const [h,m]=(val||'').split(':');const mins=['00','15','30','45'];if(m&&!mins.includes(m))mins.push(m);
-  let hs='<option value="">—</option>';for(let i=6;i<=22;i++){const x=pad(i);hs+=`<option ${x===h?'selected':''}>${x}</option>`}
+  const hh=h||'08';let hs='';for(let i=6;i<=22;i++){const x=pad(i);hs+=`<option ${x===hh?'selected':''}>${x}</option>`}hs+='<option value="">bez vremena</option>';
   return `<label class="f"><span>Vreme</span><div style="display:flex;gap:6px;align-items:center"><select name="th" aria-label="Sat">${hs}</select><b>:</b><select name="tm" aria-label="Minut">${mins.map(x=>`<option ${x===(m||'00')?'selected':''}>${x}</option>`).join('')}</select></div></label>`;
 }
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset&&t.dataset.combo){const o=t.form.querySelector(`[name="${t.dataset.combo}_other"]`);o.hidden=t.value!=='__other';if(!o.hidden)o.focus()}});
